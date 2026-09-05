@@ -1,0 +1,470 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Load Diffusion Model \u2014 H3 MODEL \u2014 REQUIRED"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "MiniMax-H3/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Load CLIP \u2014 H3 TEXT ENCODER"
+    }
+  },
+  "122": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "_meta": {
+      "title": "KSamplerSelect \u2014 Sampler algorithm"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "MiniMaw-H3/minimax_h3_video_vae_fp16.safetensors"
+    },
+    "_meta": {
+      "title": "Load VAE \u2014 H3 Video VAE"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "MiniMaw-H3/minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "Load VAE \u2014 H3 Audio VAE"
+    }
+  },
+  "1930": {
+    "class_type": "MiniMaxH3ChainScenePromptEditor",
+    "inputs": {
+      "plan": [
+        "1700",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Scene Prompt Editor \u2014 SCENE PROMPT EDITOR \u2014 STANDARD AUTHORING"
+    }
+  },
+  "1701": {
+    "class_type": "MiniMaxH3ChainLoopStart",
+    "inputs": {
+      "start_clip": 1,
+      "scene_range": "",
+      "verify_resume_history": true,
+      "plan": [
+        "1947",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Start \u2014 LOOP START / RESUME"
+    }
+  },
+  "1702": {
+    "class_type": "MiniMaxH3ChainCurrent",
+    "inputs": {
+      "align_audio_reference": false,
+      "state": [
+        "1701",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Current Shot \u2014 CURRENT T2V SCENE \u2014 PROMPT / SEED / TIMING"
+    }
+  },
+  "120": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": [
+        "1702",
+        5
+      ]
+    },
+    "_meta": {
+      "title": "RandomNoise \u2014 Per-shot noise seed"
+    }
+  },
+  "110": {
+    "class_type": "MiniMaxH3ImageToVideo",
+    "inputs": {
+      "prompt": [
+        "1702",
+        4
+      ],
+      "width": [
+        "1702",
+        8
+      ],
+      "height": [
+        "1702",
+        9
+      ],
+      "length": [
+        "1702",
+        6
+      ],
+      "clip": [
+        "2",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Image to Video \u2014 CORE T2VA \u2014 NO IMAGE INPUTS"
+    }
+  },
+  "1703": {
+    "class_type": "MiniMaxH3ChainContext",
+    "inputs": {
+      "visual_cond_noise_aug": 0.999,
+      "future_end_anchor": false,
+      "state": [
+        "1702",
+        0
+      ],
+      "conditioning": [
+        "110",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "latent": [
+        "110",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Context \u2014 AUTO CONTEXT \u2014 clip 1 bypass / continuation"
+    }
+  },
+  "5": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "1941",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMaxH3SigmaShift"
+    }
+  },
+  "121": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "5",
+        0
+      ],
+      "conditioning": [
+        "1703",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Basic Guider \u2014 Loop guider"
+    }
+  },
+  "123": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "1702",
+        7
+      ],
+      "denoise": 1,
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "BasicScheduler \u2014 Per-shot scheduler steps"
+    }
+  },
+  "124": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "120",
+        0
+      ],
+      "guider": [
+        "121",
+        0
+      ],
+      "sampler": [
+        "122",
+        0
+      ],
+      "sigmas": [
+        "123",
+        0
+      ],
+      "latent_image": [
+        "1703",
+        3
+      ]
+    },
+    "_meta": {
+      "title": "SamplerCustomAdvanced \u2014 H3 sampler \u2014 SINGLE LOOP BODY"
+    }
+  },
+  "130": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "124",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "VAE Decode \u2014 Decode current clip frames"
+    }
+  },
+  "131": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "124",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "VAE Decode Audio \u2014 Decode current clip audio"
+    }
+  },
+  "132": {
+    "class_type": "MiniMaxH3LoopTrim",
+    "inputs": {
+      "trim_frames": [
+        "1703",
+        1
+      ],
+      "fps": 24,
+      "match_tail": true,
+      "retain_overlap_frames": 0,
+      "images": [
+        "130",
+        0
+      ],
+      "audio": [
+        "131",
+        0
+      ],
+      "state": [
+        "1702",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Trim \u2014 TRIM CONTEXT / AUTO-RESOLVE SCENE BLEND"
+    }
+  },
+  "1704": {
+    "class_type": "MiniMaxH3ChainSegmentSave",
+    "inputs": {
+      "state": [
+        "1702",
+        0
+      ],
+      "images": [
+        "132",
+        0
+      ],
+      "sampled_latent": [
+        "124",
+        0
+      ],
+      "audio": [
+        "132",
+        1
+      ],
+      "images_with_overlap": [
+        "132",
+        2
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Segment + Checkpoint \u2014 SAVE DELIVERED + BLEND-READY SEGMENTS"
+    }
+  },
+  "1706": {
+    "class_type": "MiniMaxH3ChainAssemble",
+    "inputs": {
+      "audio_source": "plan",
+      "filename": "t2v_normal_%date:yyyy-MM-dd%",
+      "audio_bitrate": 256,
+      "copy_to_output": false,
+      "output_subfolder": "",
+      "blend_schedule": "plan",
+      "boundary_tone_match": "off",
+      "color_stabilization": "off",
+      "manifest": [
+        "1705",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Assemble \u2014 FINAL ASSEMBLY \u2014 5-FRAME VISUAL BLEND"
+    }
+  },
+  "1941": {
+    "class_type": "ModelAttentionBackend",
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "ModelAttentionBackend \u2014 COMFY KITCHEN ATTENTION"
+    }
+  },
+  "1705": {
+    "class_type": "MiniMaxH3ChainLoopEnd",
+    "inputs": {
+      "between_scene_cleanup": "off",
+      "flow": [
+        "1701",
+        0
+      ],
+      "state": [
+        "1702",
+        0
+      ],
+      "images": [
+        "132",
+        0
+      ],
+      "sampled_latent": [
+        "124",
+        0
+      ],
+      "segment": [
+        "1944",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop End \u2014 LOOP END \u2014 ADVANCE T2V SCENE"
+    }
+  },
+  "1700": {
+    "class_type": "MiniMaxH3ChainPlan",
+    "inputs": {
+      "plan_json": "{\n  \"prompt_prefix\": \"Naturalistic cinematic footage. Preserve the subject, wardrobe, lighting, and screen direction across the sequence.\",\n  \"defaults\": {\n    \"duration_seconds\": 5,\n    \"steps\": 20\n  },\n  \"shots\": [\n    {\n      \"id\": \"the_arrival\",\n      \"prompt\": \"A wide shot of a traveler arriving at a quiet coastal station at dawn. A soft breeze moves her coat. The camera tracks alongside her as she walks toward the platform. End with her still walking.\",\n      \"seed\": \"1001\"\n    },\n    {\n      \"id\": \"a_moment_of_stillness\",\n      \"prompt\": \"Continue the same walking motion and tracking camera from the previous scene. The traveler slows beside an empty bench, rests a hand on its back, and looks toward the sea. The morning light and wardrobe remain consistent.\",\n      \"seed\": \"1002\"\n    },\n    {\n      \"id\": \"the_departure\",\n      \"prompt\": \"Continue from her hand resting on the bench. She takes one quiet breath, turns toward the arriving train, and walks out of frame. The camera holds on the empty platform and the distant sea.\",\n      \"seed\": \"1003\"\n    }\n  ]\n}",
+      "run_name": "sceneweaver_first_film",
+      "generation_fingerprint": "sceneweaver-starter-v1",
+      "width": 960,
+      "height": 544,
+      "context_length": 22,
+      "encode_mode": "video",
+      "anchor_mode": "head",
+      "crop": "disabled",
+      "audio_mode": "generated_audio",
+      "audio_context_length": 22,
+      "default_duration_seconds": 10,
+      "default_steps": 20,
+      "base_seed": 0,
+      "segment_crf": 20,
+      "video_blend_frames": 0,
+      "continuation_mode": "guide",
+      "chain_policy": [
+        "1948",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Plan \u2014 T2V PLAN \u2014 NORMAL EDITOR"
+    }
+  },
+  "1944": {
+    "class_type": "MiniMaxH3ChainReview",
+    "inputs": {
+      "enabled": true,
+      "play_notification_sound": false,
+      "auto_continue_timeout_minutes": 0,
+      "unload_models_while_waiting": false,
+      "assemble_partial_on_stop": true,
+      "partial_audio_source": "checkpointed",
+      "candidate_count": 1,
+      "review_each_candidate": false,
+      "state": [
+        "1702",
+        0
+      ],
+      "segment": [
+        "1704",
+        0
+      ],
+      "audio": [
+        "132",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Context Loop Review Gate \u2014 REVIEW GATE \u2014 APPROVE / EDIT+RETRY / REROLL / STOP"
+    }
+  },
+  "1947": {
+    "class_type": "MiniMaxH3ChainPreflight",
+    "inputs": {
+      "start_clip": 1,
+      "scene_range": "",
+      "verify_resume_history": true,
+      "plan": [
+        "1930",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Chain Preflight \u2014 0.5 PREFLIGHT \u2014 BLOCKS BEFORE MODELS"
+    }
+  },
+  "1948": {
+    "class_type": "MiniMaxH3ChainPolicy",
+    "inputs": {
+      "incoming_transition": "guide",
+      "final_audio": "generated",
+      "source_reference": "off",
+      "generated_continuity": "on",
+      "lock_source_audio": false
+    },
+    "_meta": {
+      "title": "MiniMax H3 Manual Chain Policy (Legacy) \u2014 0.5 CHAIN POLICY"
+    }
+  }
+}

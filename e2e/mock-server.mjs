@@ -1,0 +1,47 @@
+import express from 'express';
+import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import { WebSocketServer } from 'ws';
+import { createApp } from '../server/app.mjs';
+const app = express(); app.use(express.json({ limit: '30mb' }));
+const schemas = JSON.parse(readFileSync('public/examples/h3-schemas.json'));
+const starter = JSON.parse(readFileSync('public/examples/h3-starter.api.json'));
+const upstream = http.createServer(app), ws = new WebSocketServer({ server: upstream });
+let pending = [], reviews = [], decisions = [], submissions = [];
+let assets = [{ id: 'hero', tag: 'hero', kind: 'image', role: 'picture', enabled: true, original_name: 'hero.png' }];
+const catalog = () => ({ project: 'sceneweaver_first_film', revision: String(assets[0].tag), assets });
+const broadcast = (type, data) => ws.clients.forEach(client => client.send(JSON.stringify({ type, data })));
+ws.on('connection', client => client.send(JSON.stringify({ type: 'status', data: { status: { exec_info: { queue_remaining: 0 } } } })));
+app.get('/system_stats', (_req, res) => res.json({ devices: [{ name: 'Test GPU' }] }));
+app.get('/object_info', (_req, res) => res.json(schemas));
+app.get('/queue', (_req, res) => res.json({ queue_running: [], queue_pending: pending }));
+app.get('/userdata', (_req, res) => res.json(['H3/Test workflow.json']));
+app.get('/userdata/{*path}', (_req, res) => res.json(starter));
+app.get('/history/:id', (_req, res) => res.json({}));
+app.get('/minimax_h3_context_loop/reviews', (_req, res) => res.json({ reviews }));
+app.get('/minimax_h3_context_loop/runs', (_req, res) => res.json({ runs: [] }));
+app.get('/minimax_h3_context_loop/checkpoints', (_req, res) => res.json({ checkpoints: [], revisions: [{ scene: 1, scene_id: 'the_arrival', revision: 'take-1', active: true, ready: true, raw_frames: 124, delivered_frames: 108, seed: '18446744073709551615', steps: 12, prompt: 'Saved direction', lineage_status: 'current', dependencies: [] }] }));
+app.post('/prompt', (req, res) => {
+  submissions.push(req.body); const prompt_id = `test-prompt-${submissions.length}`; pending.push([1, prompt_id, req.body.prompt, {}, []]);
+  res.json({ prompt_id, number: 1 }); broadcast('status', {});
+});
+app.post('/queue', (req, res) => { pending = pending.filter(item => !req.body.delete.includes(item[1])); res.json({}); broadcast('status', {}); });
+app.post('/minimax_h3_context_loop/review', (req, res) => { decisions.push(req.body); reviews = []; res.json({ ok: true, action: req.body.action === 'reroll' ? 'retry' : req.body.action, scene_prompt: req.body.scene_prompt, seed: req.body.action === 'reroll' ? '18446744073709551614' : req.body.seed, length: req.body.length }); broadcast('minimax_h3_context_loop_review_resolved', { token: req.body.token }); });
+app.post('/test/review', (_req, res) => {
+  reviews = [{ token: 'review-test', run_name: 'sceneweaver_first_film', clip_index: 1, clip_count: 3, shot_id: 'the_arrival', scene_prompt: 'Original', seed: '18446744073709551615', raw_frames: 124, candidate_count: 2, candidates: [{ number: 1, revision: 'take-1', seed: '1' }, { number: 2, revision: 'take-2', seed: '2' }] }];
+  broadcast('minimax_h3_context_loop_review', reviews[0]); res.json({});
+});
+app.get('/test/state', (_req, res) => res.json({ submissions, decisions }));
+app.get('/scripts/app.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-app.mjs')));
+app.get('/scripts/api.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-api.mjs')));
+app.get('/extensions', (_req, res) => res.json([]));
+app.get('/test/starter', (_req, res) => res.json(starter));
+app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock ComfyUI open workflow</h1><button id="open">Open companion</button><script type="module">import { app } from '/scripts/app.js'; document.querySelector('#open').onclick = async () => { const child = window.open('about:blank', '_blank'); const { launch } = await import('http://127.0.0.1:4319/integrations/companion-client.mjs'); await launch(child, 'http://127.0.0.1:4319'); };</script></body></html>`));
+app.get('/minimax_h3_context_loop/project-assets', (_req, res) => res.json(catalog()));
+app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
+app.get('/minimax_h3_context_loop/project-assets/media', (_req, res) => res.type('image/svg+xml').send('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#334139"/><circle cx="120" cy="65" r="25" fill="#829589"/></svg>'));
+app.post('/test/reset', (_req, res) => { pending = []; reviews = []; submissions = []; decisions = []; assets[0].tag = 'hero'; res.json({}); });
+app.post('/test/disconnect', (_req, res) => { ws.clients.forEach(client => client.close()); res.json({}); });
+upstream.listen(0, '127.0.0.1', () => {
+  const { server } = createApp({ target: `http://127.0.0.1:${upstream.address().port}` }); server.listen(4319, '127.0.0.1');
+});

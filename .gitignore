@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*
+!.env.example
+.agents/
+.codex/
+.DS_Store
+test-results/
+playwright-report/
+data/
+*.tsbuildinfo

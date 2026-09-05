@@ -1,0 +1,1862 @@
+{
+  "SamplerCustomAdvanced": {
+    "input": {
+      "required": {
+        "noise": [
+          "NOISE",
+          {}
+        ],
+        "guider": [
+          "GUIDER",
+          {}
+        ],
+        "sampler": [
+          "SAMPLER",
+          {}
+        ],
+        "sigmas": [
+          "SIGMAS",
+          {}
+        ],
+        "latent_image": [
+          "LATENT",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "noise",
+        "guider",
+        "sampler",
+        "sigmas",
+        "latent_image"
+      ]
+    },
+    "output": [
+      "LATENT",
+      "LATENT"
+    ],
+    "output_name": [
+      "output",
+      "denoised_output"
+    ],
+    "display_name": null,
+    "category": "model/sampling/custom",
+    "output_node": false
+  },
+  "MiniMaxH3LoopTrim": {
+    "input": {
+      "required": {
+        "images": [
+          "IMAGE",
+          {
+            "tooltip": "Decoded images from the CURRENT H3 sample. The leading pinned overlap is removed."
+          }
+        ],
+        "trim_frames": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 4096,
+            "tooltip": "Connect trim_frames from MiniMax H3 Context Loop Context. In head mode this removes the repeated overlap; before mode supplies 0."
+          }
+        ]
+      },
+      "optional": {
+        "audio": [
+          "AUDIO",
+          {
+            "tooltip": "Decoded audio for the same clip. Trimmed by the matching duration so sound stays locked to picture. Leave unwired for silent clips."
+          }
+        ],
+        "fps": [
+          "FLOAT",
+          {
+            "default": 24.0,
+            "min": 1.0,
+            "max": 240.0,
+            "step": 0.001,
+            "tooltip": "Frame rate used to convert the trim into an audio duration. Must match what you feed Create Video."
+          }
+        ],
+        "match_tail": [
+          "BOOLEAN",
+          {
+            "default": true,
+            "tooltip": "Time-conform small H3 audio-grid mismatches so duration equals frames/fps exactly without a silence tail. H3's rounded 40 Hz grid can differ from picture duration by about 8ms."
+          }
+        ],
+        "retain_overlap_frames": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 4096,
+            "tooltip": "Legacy/manual visual overlap for an external stitcher. In a 0.5 chain, connect Current Shot's state output below and this integer is ignored; Loop Trim then resolves the exact per-scene blend from the Plan automatically."
+          }
+        ],
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Recommended 0.5 chain route: connect Current Shot's state output. Loop Trim reads the active scene's resolved blend directly, so a Plan default can never override a per-scene value."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "images",
+        "trim_frames"
+      ],
+      "optional": [
+        "audio",
+        "fps",
+        "match_tail",
+        "retain_overlap_frames",
+        "state"
+      ]
+    },
+    "output": [
+      "IMAGE",
+      "AUDIO",
+      "IMAGE",
+      "INT"
+    ],
+    "output_name": [
+      "images",
+      "audio",
+      "images_with_overlap",
+      "overlap_frames"
+    ],
+    "display_name": "MiniMax H3 Context Loop Trim",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "VAELoader": {
+    "input": {
+      "required": {
+        "vae_name": [
+          [
+            "MiniMaw-H3/minimax_h3_video_vae_fp16.safetensors",
+            "MiniMaw-H3/minimax_h3_audio_vae_fp32.safetensors"
+          ]
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "vae_name"
+      ]
+    },
+    "output": [
+      "VAE"
+    ],
+    "output_name": [
+      "VAE"
+    ],
+    "display_name": "Load VAE",
+    "category": "model/loaders",
+    "output_node": false
+  },
+  "MiniMaxH3ChainPolicy": {
+    "input": {
+      "required": {
+        "incoming_transition": [
+          [
+            "cut",
+            "guide",
+            "hard_av",
+            "soft_av"
+          ],
+          {
+            "default": "guide",
+            "tooltip": "Default boundary entering a scene: Visual Cut = no carried picture; Guide = 22-frame RGB continuation; Hard AV = protected 39-frame picture/audio prefix; Soft AV = the same hard picture prefix with a short audio release. A scene can inherit or override this default in Plan Studio."
+          }
+        ],
+        "final_audio": [
+          [
+            "generated",
+            "source",
+            "none"
+          ],
+          {
+            "default": "generated",
+            "tooltip": "Soundtrack muxed into the final MP4: H3's saved generated sound, the exact source track, or no soundtrack."
+          }
+        ],
+        "source_reference": [
+          [
+            "off",
+            "on"
+          ],
+          {
+            "default": "off",
+            "tooltip": "Use the matching Source Timeline audio as guidance while H3 generates this scene's sound. This does not copy the source waveform into the result or choose the final MP4 soundtrack. To force the exact source waveform during generation, enable Lock source audio; to put it in the final MP4, set Final audio to source. Lock automatically turns this reference off."
+          }
+        ],
+        "generated_continuity": [
+          [
+            "off",
+            "on"
+          ],
+          {
+            "default": "on",
+            "tooltip": "On carries the previous sampled audio latent across scene boundaries. Guide uses the tested automatic 22-frame sound context; AV follows its exact shared video boundary. Off leaves target audio fully denoisable. This does not select the final soundtrack. Lock source audio overrides this off."
+          }
+        ],
+        "lock_source_audio": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Encode each scene's exact Source Timeline window directly into the target H3 audio latent and protect the complete audio mask from denoising. This automatically replaces Source reference and Generated continuity for generation. Choose Final audio=source when the final MP4 must retain the original waveform."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "incoming_transition",
+        "final_audio",
+        "source_reference",
+        "generated_continuity",
+        "lock_source_audio"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_POLICY",
+      "STRING"
+    ],
+    "output_name": [
+      "chain_policy",
+      "status"
+    ],
+    "display_name": "MiniMax H3 Manual Chain Policy (Legacy)",
+    "category": "conditioning/minimax/context_loop/policies",
+    "output_node": false
+  },
+  "MiniMaxH3ChainLoopStart": {
+    "input": {
+      "required": {
+        "plan": [
+          "H3_CHAIN_PLAN",
+          {
+            "tooltip": "Validated output from H3 Chain Plan."
+          }
+        ],
+        "start_clip": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 128,
+            "tooltip": "Legacy/resume scene to render next. Use 1 for a new chain. A non-empty scene_range overrides this value. A value above 1 loads and validates the saved checkpoint for the preceding scene before resuming."
+          }
+        ]
+      },
+      "optional": {
+        "scene_range": [
+          "STRING",
+          {
+            "default": "",
+            "tooltip": "Inclusive contiguous scenes to generate. Leave blank to run from start_clip through the end; use 3 for only scene 3 or 3:8 for scenes 3 through 8. A start above 1 requires the preceding checkpoint. Disjoint comma selections are rejected because they break continuity."
+          }
+        ],
+        "verify_resume_history": [
+          "BOOLEAN",
+          {
+            "default": true,
+            "tooltip": "Recommended ON: require every predecessor consumed by this scene to match the current Plan's prompts, seeds, timing, source audio, model, and reference fingerprint. An audio-only edge does not compare the saved predecessor's unrelated visual-boundary recipe. Turn OFF only to deliberately reuse the saved predecessor after changing the current Plan. Missing files, SHA-256 artifact integrity, checkpoint tensor shape, and internal metadata consistency are still verified. Changes to the predecessor itself are not applied retroactively."
+          }
+        ],
+        "source_audio": [
+          "AUDIO",
+          {
+            "tooltip": "Legacy 0.4 full-AUDIO route. Leave this unconnected in a 0.5 workflow when source_timeline is connected; the two inputs are mutually exclusive. Use this socket only for an older workflow whose Audio Policy needs final source audio or Source reference=on. Loop Start saves it once as a path-backed run asset, so Current Shot, partial review, final assembly, and full-chain finishing do not need the AUDIO wired again. A short, completely silent placeholder is padded."
+          }
+        ],
+        "external_context": [
+          "H3_CHAIN_EXTERNAL_CONTEXT",
+          {
+            "tooltip": "Optional output from MiniMax H3 Existing Video Context. When connected, scene 1 continues from that video's tail and its repeated head is trimmed exactly like every later scene."
+          }
+        ],
+        "source_timeline": [
+          "H3_SOURCE_TIMELINE",
+          {
+            "tooltip": "Primary 0.5 media wire from Source Timeline or Run Manager. It replaces the repeated full source_audio connection and stays lazy across recursive scenes."
+          }
+        ]
+      },
+      "hidden": {
+        "initial_state": [
+          "H3_CHAIN_STATE"
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "plan",
+        "start_clip"
+      ],
+      "optional": [
+        "scene_range",
+        "verify_resume_history",
+        "source_audio",
+        "external_context",
+        "source_timeline"
+      ],
+      "hidden": [
+        "initial_state"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_FLOW",
+      "H3_CHAIN_STATE",
+      "STRING"
+    ],
+    "output_name": [
+      "flow",
+      "state",
+      "status"
+    ],
+    "display_name": "MiniMax H3 Context Loop Start",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "BasicGuider": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL",
+          {}
+        ],
+        "conditioning": [
+          "CONDITIONING",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "conditioning"
+      ]
+    },
+    "output": [
+      "GUIDER"
+    ],
+    "output_name": [
+      "GUIDER"
+    ],
+    "display_name": "Basic Guider",
+    "category": "model/sampling/guiders",
+    "output_node": false
+  },
+  "MiniMaxH3ChainCurrent": {
+    "input": {
+      "required": {
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Current state from H3 Chain Loop Start."
+          }
+        ]
+      },
+      "optional": {
+        "source_audio": [
+          "AUDIO",
+          {
+            "tooltip": "Legacy 0.4 full-track input. Loop Start now carries a path-backed copy in state, so this wire is unnecessary. A still-connected copy is accepted only when its fingerprint matches."
+          }
+        ],
+        "align_audio_reference": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Experimental. Cap only source_audio_slice 5ms below H3's rounded 40 Hz target-audio boundary. For 362 frames this changes 15.083333s to 15.070s while retaining 603 reference steps and a short padded tail. Shorter slices are unchanged. The full source track used by Assemble is never modified."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "state"
+      ],
+      "optional": [
+        "source_audio",
+        "align_audio_reference"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_STATE",
+      "INT",
+      "INT",
+      "STRING",
+      "STRING",
+      "INT",
+      "INT",
+      "INT",
+      "INT",
+      "INT",
+      "FLOAT",
+      "FLOAT",
+      "AUDIO",
+      "STRING",
+      "INT"
+    ],
+    "output_name": [
+      "state",
+      "clip_index",
+      "clip_count",
+      "shot_id",
+      "prompt",
+      "noise_seed",
+      "length",
+      "steps",
+      "width",
+      "height",
+      "audio_start",
+      "audio_duration",
+      "source_audio_slice",
+      "status",
+      "video_blend_frames"
+    ],
+    "display_name": "MiniMax H3 Context Loop Current Shot",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "MiniMaxH3SigmaShift": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL",
+          {}
+        ],
+        "shift_video": [
+          "FLOAT",
+          {
+            "default": 12.0,
+            "min": 0.01,
+            "max": 100.0,
+            "step": 0.01
+          }
+        ],
+        "shift_audio": [
+          "FLOAT",
+          {
+            "default": 3.0,
+            "min": 0.01,
+            "max": 100.0,
+            "step": 0.01
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "shift_video",
+        "shift_audio"
+      ]
+    },
+    "output": [
+      "MODEL"
+    ],
+    "output_name": [
+      "MODEL"
+    ],
+    "display_name": "ModelSamplingMiniMaxH3",
+    "category": "model/patch/minimax",
+    "output_node": false
+  },
+  "RandomNoise": {
+    "input": {
+      "required": {
+        "noise_seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "noise_seed"
+      ]
+    },
+    "output": [
+      "NOISE"
+    ],
+    "output_name": [
+      "NOISE"
+    ],
+    "display_name": null,
+    "category": "model/sampling/noise",
+    "output_node": false
+  },
+  "MiniMaxH3ChainReview": {
+    "input": {
+      "required": {
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Current state from H3 Chain Current Shot. It identifies the scene whose saved segment is being reviewed."
+          }
+        ],
+        "segment": [
+          "H3_CHAIN_SEGMENT",
+          {
+            "tooltip": "Persisted scene output from H3 Chain Segment Save. Saving before review makes every accepted scene recoverable."
+          }
+        ],
+        "enabled": [
+          "BOOLEAN",
+          {
+            "default": true,
+            "tooltip": "Pause after every saved segment for approval. A connected, enabled Pending Review node overrides this toggle so the completed batch can be stored and stopped."
+          }
+        ],
+        "play_notification_sound": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Play a browser chime when a segment becomes ready for review."
+          }
+        ],
+        "auto_continue_timeout_minutes": [
+          "FLOAT",
+          {
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1440.0,
+            "step": 0.5,
+            "tooltip": "Automatically approve and continue after this many minutes. 0 waits indefinitely."
+          }
+        ],
+        "unload_models_while_waiting": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Release model weights from VRAM after the review appears. Approval remains responsive; continuing must reload the model stack."
+          }
+        ],
+        "assemble_partial_on_stop": [
+          "BOOLEAN",
+          {
+            "default": true,
+            "tooltip": "Approve & stop also joins every accepted segment through the current scene into a partial MP4."
+          }
+        ],
+        "partial_audio_source": [
+          [
+            "checkpointed",
+            "source",
+            "none"
+          ],
+          {
+            "default": "checkpointed",
+            "tooltip": "Audio for the partial MP4 created by Approve & Stop. checkpointed uses each saved generated delivered-audio track; source uses the exact Source Timeline audio carried in state, or the legacy full source_audio input when no Source Timeline is available; none creates a silent partial."
+          }
+        ]
+      },
+      "optional": {
+        "audio": [
+          "AUDIO",
+          {
+            "tooltip": "Wire frame-exact delivered audio from H3 MiniMax H3 Context Loop Trim for synchronized review."
+          }
+        ],
+        "source_audio": [
+          "AUDIO",
+          {
+            "tooltip": "Fallback only for runs whose state predates recoverable source audio. Both Source Timeline and a legacy AUDIO connected at Loop Start are now carried path-backed in state. This does not affect generation or the per-scene preview."
+          }
+        ],
+        "candidate_count": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 20,
+            "step": 1,
+            "tooltip": "Generate this many different-seed takes in a row before Review Gate pauses. Mark one or more takes to keep and choose which exact checkpoint continues the chain; unkept alternatives are deleted. Convert this widget to an input to drive it from an INT node."
+          }
+        ],
+        "review_each_candidate": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Optional inspection mode. Pause after every saved take so the candidate run can be accepted early or advanced manually. Leave off to generate the full candidate_count batch automatically and review it once at the end."
+          }
+        ],
+        "pending_review": [
+          "H3_REVIEW_DISPOSITION",
+          {
+            "tooltip": "Optional MiniMax H3 Pending Review control. When enabled, Review Gate generates the full candidate batch, persists it for later review, and stops cleanly instead of waiting for a browser decision."
+          }
+        ]
+      },
+      "hidden": {
+        "dynprompt": "DYNPROMPT",
+        "unique_id": "UNIQUE_ID"
+      }
+    },
+    "input_order": {
+      "required": [
+        "state",
+        "segment",
+        "enabled",
+        "play_notification_sound",
+        "auto_continue_timeout_minutes",
+        "unload_models_while_waiting",
+        "assemble_partial_on_stop",
+        "partial_audio_source"
+      ],
+      "optional": [
+        "audio",
+        "source_audio",
+        "candidate_count",
+        "review_each_candidate",
+        "pending_review"
+      ],
+      "hidden": [
+        "dynprompt",
+        "unique_id"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_SEGMENT",
+      "STRING"
+    ],
+    "output_name": [
+      "segment",
+      "status"
+    ],
+    "display_name": "MiniMax H3 Context Loop Review Gate",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": true
+  },
+  "MiniMaxH3ChainLoopEnd": {
+    "input": {
+      "required": {
+        "flow": [
+          "H3_CHAIN_FLOW",
+          {
+            "rawLink": true,
+            "tooltip": "Connect DIRECTLY from Loop Start's flow output. This raw link defines the recursive body that Loop End clones for later scenes."
+          }
+        ],
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Current state from Current Shot. Loop End adds the accepted segment and advances its scene index."
+          }
+        ],
+        "images": [
+          "IMAGE",
+          {
+            "tooltip": "Delivered current-scene images after Motion Context Trim. Their tail becomes the next scene's visual context."
+          }
+        ],
+        "sampled_latent": [
+          "LATENT",
+          {
+            "tooltip": "Current sampler output. Its AV streams become the next scene's generated-audio context when the selected audio mode requires it."
+          }
+        ],
+        "segment": [
+          "H3_CHAIN_SEGMENT",
+          {
+            "tooltip": "Approved persisted segment from Review Gate, or directly from Segment Save when no review is wanted."
+          }
+        ]
+      },
+      "optional": {
+        "between_scene_cleanup": [
+          [
+            "off",
+            "unload_models",
+            "fresh_scene"
+          ],
+          {
+            "default": "off",
+            "tooltip": "Runtime-only memory policy applied after a scene is safely checkpointed and before the next scene or retry starts. off keeps ComfyUI caches; unload_models releases loaded weights from VRAM; fresh_scene first requests active RAM-pressure-cache eviction and Python garbage collection, then releases remaining pinned model pages, unloads models, and empties the CUDA allocator. fresh_scene may reload model/reference nodes and is best for model-switching chains. ComfyUI has no safe full executor reset inside a running recursive prompt, so the small live loop carry remains."
+          }
+        ]
+      },
+      "hidden": {
+        "dynprompt": "DYNPROMPT",
+        "unique_id": "UNIQUE_ID"
+      }
+    },
+    "input_order": {
+      "required": [
+        "flow",
+        "state",
+        "images",
+        "sampled_latent",
+        "segment"
+      ],
+      "optional": [
+        "between_scene_cleanup"
+      ],
+      "hidden": [
+        "dynprompt",
+        "unique_id"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_MANIFEST",
+      "STRING",
+      "IMAGE",
+      "LATENT"
+    ],
+    "output_name": [
+      "manifest",
+      "manifest_json",
+      "last_context_frames",
+      "last_context_latent"
+    ],
+    "display_name": "MiniMax H3 Context Loop End",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "MiniMaxH3ChainPlan": {
+    "input": {
+      "required": {
+        "plan_json": [
+          "STRING",
+          {
+            "default": "{\n  \"shots\": [\n    {\n      \"id\": \"intro\",\n      \"prompt\": \"Describe the opening shot.\"\n    },\n    {\n      \"id\": \"continuation\",\n      \"prompt\": \"Continue the same take.\"\n    }\n  ]\n}",
+            "multiline": true,
+            "dynamicPrompts": false,
+            "tooltip": "The editable production plan behind the large Scene Plan interface: shared prompt, ordered scene prompts, optional lengths, sampler steps, per-scene context, continuation, and seed overrides. Use the visual editor for normal work and Raw JSON only for import, export, or advanced editing. Reference media is connected elsewhere; this JSON only mentions native @tags, Tagged Picture semantic anchors such as #hero[2.50s], or native <Picture/Video/Audio N> labels. Scene prompts may use {first option|second option}; Plan resolves each group from that scene's Prompt alternatives control."
+          }
+        ],
+        "run_name": [
+          "STRING",
+          {
+            "default": "h3_chain",
+            "tooltip": "Identity of one render history and its folder under ComfyUI output/h3_chains. Keep it unchanged to resume or regenerate scenes from that same production. Use a new name for a separate render; reusing a name intentionally exposes that run's existing checkpoints to Review Gate and resume."
+          }
+        ],
+        "generation_fingerprint": [
+          "STRING",
+          {
+            "default": "",
+            "tooltip": "Checkpoint compatibility tag for generation inputs not stored in plan_json. Connect Scheduled Ref2VA's schedule_fingerprint when using scheduled references. Otherwise enter/change a stable tag whenever the model, VAE, LoRA, global references, CFG, sampler, or scheduler changes. Resume rejects a mismatched fingerprint instead of mixing runs."
+          }
+        ],
+        "width": [
+          "INT",
+          {
+            "default": 960,
+            "min": 32,
+            "max": 4096,
+            "step": 32,
+            "tooltip": "Generation width for every scene. Connect the Plan width output to the stock Ref2VA/I2V node so its latent always matches the plan."
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 544,
+            "min": 32,
+            "max": 4096,
+            "step": 32,
+            "tooltip": "Generation height for every scene. Connect the Plan height output to the stock Ref2VA/I2V node so its latent always matches the plan."
+          }
+        ],
+        "context_length": [
+          [
+            1,
+            5,
+            22,
+            39,
+            56,
+            73,
+            90,
+            107,
+            124,
+            141,
+            158,
+            175,
+            192,
+            209,
+            226,
+            243
+          ],
+          {
+            "default": 22,
+            "tooltip": "Legacy 0.4 fallback, hidden in the normal 0.5 interface. Connect Generation Profile for new workflows or the Legacy 0.4 Policy Adapter when rebuilding an old control surface. Default previous-scene video frames used to continue motion. Use 22 for guide mode and 39 for masked_av, tapered_av, feathered_av, or audio_feathered_av/Drift AV so the AV clocks meet exactly. For diagnostics, basic masked/audio-feathered AV may use a 5+ frame video-only overlap when Generated continuity is off (or scene audio context is 0); Detail and Drift AV remain fixed at 39. A scene's Advanced selector can override this; blank inherits it and 0 starts a visually new scene. Audio context is controlled separately. With head anchors, those frames are regenerated at the start and Loop Trim removes them, so later scenes deliver raw scene frames minus context_length. Larger values strengthen motion continuity but produce fewer new frames per scene. This does not control reference-audio duration."
+          }
+        ],
+        "encode_mode": [
+          [
+            "video",
+            "frames"
+          ],
+          {
+            "default": "video",
+            "tooltip": "How the carried visual overlap is encoded. Use video (recommended) to preserve the previous frames as one motion-bearing latent clip. frames creates separate still-image anchors, costs more conditioning space, and is mainly for diagnosing or experimenting with anchor behavior."
+          }
+        ],
+        "anchor_mode": [
+          [
+            "head",
+            "before"
+          ],
+          {
+            "default": "head",
+            "tooltip": "Where previous frames sit on the next scene's timeline. head is the tested default: it repeats the overlap at the beginning, and Loop Trim must remove exactly trim_frames. before places context at negative time and returns no repeated head; use it only for workflows deliberately built around that experimental timing."
+          }
+        ],
+        "crop": [
+          [
+            "disabled",
+            "center"
+          ],
+          {
+            "default": "disabled",
+            "tooltip": "How saved context frames are fitted when their shape differs from the Plan canvas. disabled resizes directly to width x height and may change aspect ratio. center preserves aspect ratio, then center-crops overflow. It does not crop Ref2VA picture/video reference inputs."
+          }
+        ],
+        "audio_mode": [
+          [
+            "source_track",
+            "generated_audio",
+            "source_plus_timeline"
+          ],
+          {
+            "default": "generated_audio",
+            "tooltip": "Legacy 0.4 fallback, hidden in the normal 0.5 interface and used only when no H3 Audio Policy is connected. It controls timeline continuity and final audio; it does NOT enable or disable @voice/<Audio N> references. For a finished prerecorded voice, dialogue, or song that must remain exact, choose source_track: wire the full track to Loop Start and Assemble, and feed Current Shot's exact slice to Ref2VA/Scheduled Audio. For a short @voice identity/timbre reference while H3 generates new speech and sound, choose generated_audio: no full source track is required, connect the audio VAE to Loop Context, and save trimmed generated audio. source_plus_timeline provides both an exact source slice and previous generated-audio context; it is experimental and usually not the first choice."
+          }
+        ],
+        "audio_context_length": [
+          "INT",
+          {
+            "default": 22,
+            "min": 0,
+            "max": 240,
+            "tooltip": "Legacy 0.4 fallback amount of previous generated sound carried into the next scene, measured in 24-fps video frames. Normal Chain Policy derives 0/22/39 from Cut, Guide, or AV automatically. This field is active only when the Audio Policy has Generated continuity=on. Legacy generated_audio and source_plus_timeline enable that axis; source_track disables it. AV mask modes use zero versus positive as an audio-carry switch: positive preserves audio for the exact video-prefix duration required by the shared AV clock, while zero leaves audio fully denoisable. A scene's Advanced Audio context can override this default; there, explicit 0 means no audio carry."
+          }
+        ],
+        "default_duration_seconds": [
+          "FLOAT",
+          {
+            "default": 15.0,
+            "min": 0.1,
+            "max": 149.66666666666666,
+            "step": 0.01,
+            "tooltip": "Fallback duration only when the scene and JSON defaults both omit a duration/length. H3 cannot generate every frame count, so seconds round UP to the next valid 17k+5 raw length. In head mode, continuation scenes then lose their effective context repeated frames from their delivered duration."
+          }
+        ],
+        "default_steps": [
+          "INT",
+          {
+            "default": 20,
+            "min": 1,
+            "max": 10000,
+            "tooltip": "Fallback sampler steps only when a scene and the JSON defaults both omit steps. A value set under a scene's Show advanced section overrides this."
+          }
+        ],
+        "base_seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "tooltip": "Base used to derive a stable different seed for each scene that has no explicit seed. Review Gate's Reroll seed does NOT change base_seed; it writes an explicit override into that scene's always-visible Scene seed field, leaving every other scene reproducible and checkpoint-compatible."
+          }
+        ],
+        "segment_crf": [
+          "INT",
+          {
+            "default": 18,
+            "min": 0,
+            "max": 51,
+            "tooltip": "H.264 quality for each saved scene MP4 (and normalized imported prelude): lower means higher quality and larger files. 18 is visually high quality; 0 is lossless and 51 is lowest quality. This does not change model sampling or the saved safetensors continuation checkpoint."
+          }
+        ],
+        "video_blend_frames": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 243,
+            "tooltip": "Default visual blend entering each scene, in frames. A scene's Blend entering scene field can override it; blank inherits this value, capped to that scene's context, and 0 makes a hard cut. A positive value requires head anchors. In a 0.5 workflow, connect Current Shot's state output to Loop Trim's state input; Loop Trim resolves this default plus any scene override automatically. Connect Loop Trim's images_with_overlap output to Segment Save. Final and partial videos are re-encoded with a linear cumulative blend; audio timing and the delivered duration remain unchanged."
+          }
+        ],
+        "continuation_mode": [
+          [
+            "guide",
+            "tone_carry_guide",
+            "latent_guide",
+            "tapered_guide",
+            "masked_av",
+            "tapered_av",
+            "feathered_av",
+            "audio_feathered_av",
+            "drift_control_av",
+            "color_stable_drift_av"
+          ],
+          {
+            "default": "guide",
+            "tooltip": "Legacy 0.4 fallback, hidden in the normal 0.5 interface. Connect Generation Profile for new workflows. Inherited default for scenes without a per-scene continuation override. guide keeps the established Motion Context path: previous AV is supplied as fixed guide rows while the overlap is regenerated. tone_carry_guide uses the RGB guide path and applies the predecessor's detected direct tone curve before VAE encoding. masked_av (experimental) VAE-encodes the previous video tail into the current target latent and protects it with a denoise mask. tapered_av (Detail AV) makes a disposable Gaussian-noised copy of only that carried video prefix before applying the same hard mask; audio is never noised. With Generated continuity on it also copies and protects the matching sampled-audio tail; with that policy off, target audio remains fully denoisable for source/reference guidance. feathered_av uses the same prefix but progressively denoises its final temporal steps for a softer handoff. audio_feathered_av keeps the picture prefix hard while releasing only the last eight audio latent ticks with a half-cosine ramp. drift_control_av keeps the clean predecessor checkpoint unchanged but applies a per-model-evaluation, next-sigma video mask with an 8+4 clean-seam taper; it requires the H3 MODEL to pass through Chain Context. All AV modes require video/head, context >= 5, the Chain Context latent output wired to the sampler, and native or compatible H3 AV-mask support."
+          }
+        ]
+      },
+      "optional": {
+        "plan_json_input": [
+          "STRING",
+          {
+            "forceInput": true,
+            "tooltip": "Optional complete scene-plan JSON supplied by another node, such as an LLM story director or reusable STRING source. A non-empty connected value overrides the visual editor's internal plan_json for this execution and passes through the same normalization and validation. Empty or disconnected input uses the internal plan_json unchanged."
+          }
+        ],
+        "chain_policy": [
+          "H3_CHAIN_POLICY",
+          {
+            "tooltip": "Connect MiniMax H3 Generation Profile directly, or pass it through Advanced Policy or the Legacy 0.4 Policy Adapter. It combines transition, final soundtrack, source-audio reference, generated audio continuity, and automatic audio context in one connection."
+          }
+        ],
+        "project_assets": [
+          "H3_PROJECT_ASSETS",
+          {
+            "tooltip": "Optional upstream Project Asset Manager. Its Run name overrides and synchronizes this Plan's run_name; do not enter it twice. Its order-neutral reference lineage is folded into generation_fingerprint automatically. Its Source track is stored on the Plan for Loop Start, Plan Studio, and recovery; no separate Source Timeline wire is needed."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "plan_json",
+        "run_name",
+        "generation_fingerprint",
+        "width",
+        "height",
+        "context_length",
+        "encode_mode",
+        "anchor_mode",
+        "crop",
+        "audio_mode",
+        "audio_context_length",
+        "default_duration_seconds",
+        "default_steps",
+        "base_seed",
+        "segment_crf",
+        "video_blend_frames",
+        "continuation_mode"
+      ],
+      "optional": [
+        "plan_json_input",
+        "chain_policy",
+        "project_assets"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_PLAN",
+      "STRING",
+      "INT",
+      "INT",
+      "INT",
+      "INT"
+    ],
+    "output_name": [
+      "plan",
+      "summary",
+      "clip_count",
+      "width",
+      "height",
+      "video_blend_frames"
+    ],
+    "display_name": "MiniMax H3 Context Loop Plan",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "UNETLoader": {
+    "input": {
+      "required": {
+        "unet_name": [
+          [
+            "MiniMax-H3/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+          ]
+        ],
+        "weight_dtype": [
+          [
+            "default",
+            "fp8_e4m3fn",
+            "fp8_e4m3fn_fast",
+            "fp8_e5m2"
+          ],
+          {
+            "advanced": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "unet_name",
+        "weight_dtype"
+      ]
+    },
+    "output": [
+      "MODEL"
+    ],
+    "output_name": [
+      "MODEL"
+    ],
+    "display_name": "Load Diffusion Model",
+    "category": "model/loaders",
+    "output_node": false
+  },
+  "MiniMaxH3ChainScenePromptEditor": {
+    "input": {
+      "required": {
+        "plan": [
+          "H3_CHAIN_PLAN",
+          {
+            "tooltip": "Connect the H3 Chain Plan output. The companion editor modifies that Plan node's active scene prompt directly; this socket passes the validated plan through unchanged."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "plan"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_PLAN"
+    ],
+    "output_name": [
+      "plan"
+    ],
+    "display_name": "MiniMax H3 Scene Prompt Editor",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "VAEDecode": {
+    "input": {
+      "required": {
+        "samples": [
+          "LATENT",
+          {
+            "tooltip": "The latent to be decoded."
+          }
+        ],
+        "vae": [
+          "VAE",
+          {
+            "tooltip": "The VAE model used for decoding the latent."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "samples",
+        "vae"
+      ]
+    },
+    "output": [
+      "IMAGE"
+    ],
+    "output_name": [
+      "IMAGE"
+    ],
+    "display_name": "VAE Decode",
+    "category": "model/latent",
+    "output_node": false
+  },
+  "MiniMaxH3ChainPreflight": {
+    "input": {
+      "required": {
+        "plan": [
+          "H3_CHAIN_PLAN",
+          {
+            "tooltip": "Connect the validated H3 Chain Plan to inspect."
+          }
+        ]
+      },
+      "optional": {
+        "source_timeline": [
+          "H3_SOURCE_TIMELINE",
+          {
+            "tooltip": "Optional source media for the shared model-free preflight."
+          }
+        ],
+        "source_audio": [
+          "AUDIO",
+          {
+            "tooltip": "Legacy source route; do not connect with Source Timeline."
+          }
+        ],
+        "start_clip": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 128,
+            "tooltip": "Resume scene to preflight."
+          }
+        ],
+        "scene_range": [
+          "STRING",
+          {
+            "default": "",
+            "tooltip": "Optional contiguous scene selection to preflight."
+          }
+        ],
+        "verify_resume_history": [
+          "BOOLEAN",
+          {
+            "default": true,
+            "tooltip": "When resuming after scene 1, compare each saved predecessor actually consumed by the selected scene with the active Plan. Audio-only carry ignores the predecessor's unrelated visual-boundary recipe. Disable only for an intentional advanced recovery from known artifacts."
+          }
+        ],
+        "tagged_references": [
+          "H3_TAGGED_REFERENCES",
+          {
+            "tooltip": "Optional active prompt-driven reference registry. In standalone Plan Studio it also supplies the automatic incremental generation fingerprint, including bundled semantic anchors."
+          }
+        ],
+        "reference_schedule": [
+          "H3_REFERENCE_SCHEDULE",
+          {
+            "tooltip": "Optional legacy scheduled reference registry."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "plan"
+      ],
+      "optional": [
+        "source_timeline",
+        "source_audio",
+        "start_clip",
+        "scene_range",
+        "verify_resume_history",
+        "tagged_references",
+        "reference_schedule"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_PLAN",
+      "H3_PREFLIGHT_REPORT",
+      "BOOLEAN",
+      "STRING",
+      "STRING"
+    ],
+    "output_name": [
+      "plan",
+      "preflight",
+      "ready",
+      "status",
+      "report_json"
+    ],
+    "display_name": "MiniMax H3 Chain Preflight",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "BasicScheduler": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL",
+          {}
+        ],
+        "scheduler": [
+          "COMBO",
+          {
+            "multiselect": false,
+            "options": [
+              "simple",
+              "sgm_uniform",
+              "karras",
+              "exponential",
+              "ddim_uniform",
+              "beta",
+              "normal",
+              "linear_quadratic",
+              "kl_optimal",
+              "bong_tangent",
+              "beta57"
+            ]
+          }
+        ],
+        "steps": [
+          "INT",
+          {
+            "default": 20,
+            "min": 1,
+            "max": 10000
+          }
+        ],
+        "denoise": [
+          "FLOAT",
+          {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "scheduler",
+        "steps",
+        "denoise"
+      ]
+    },
+    "output": [
+      "SIGMAS"
+    ],
+    "output_name": [
+      "SIGMAS"
+    ],
+    "display_name": null,
+    "category": "model/sampling/schedulers",
+    "output_node": false
+  },
+  "MiniMaxH3ChainContext": {
+    "input": {
+      "required": {
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Current state from H3 Chain Current Shot."
+          }
+        ],
+        "conditioning": [
+          "CONDITIONING",
+          {
+            "tooltip": "Conditioning from the stock MiniMax H3 Ref2VA/I2V node. Scene 1 passes through without motion context; later scenes receive the saved visual context selected in Plan plus immediate generated-audio continuity when enabled."
+          }
+        ],
+        "vae": [
+          "VAE",
+          {
+            "tooltip": "MiniMax H3 video VAE used to encode saved context frames for continuation scenes."
+          }
+        ],
+        "latent": [
+          "LATENT",
+          {
+            "tooltip": "The CURRENT scene's empty AV latent from the stock H3 conditioning node. Chain Context passes it through in guide mode or returns a masked preserved-prefix copy in an AV mask mode."
+          }
+        ]
+      },
+      "optional": {
+        "audio_vae": [
+          "VAE",
+          {
+            "tooltip": "H3 audio VAE used when scene 1 continues from imported audio or when Chain Policy locks each source-audio window into the target latent. It may be left disconnected only when neither behavior is active."
+          }
+        ],
+        "model": [
+          "MODEL",
+          {
+            "tooltip": "Required by Drift-Control AV and Color-Stable Drift AV. Connect one MiniMax H3 MODEL here for a single-model sampler. For a sigma split that switches models, leave this disconnected, connect the full drift_sigmas schedule, and put one Drift-Control Model Patch on EACH raw model branch. Other modes pass a connected MODEL through unchanged."
+          }
+        ],
+        "drift_sigmas": [
+          "SIGMAS",
+          {
+            "tooltip": "Optional original FULL sigma schedule before any split. Connect it for either Drift AV when sampling is divided across stages so both model branches use one canonical next-sigma schedule. This also selects the external per-model patch route when Chain Context's MODEL input is disconnected."
+          }
+        ],
+        "boundary_anchors": [
+          "H3_BOUNDARY_ANCHORS",
+          {
+            "tooltip": "Optional scene-indexed latent registry from Extract Boundary Anchors. When connected, every scene\u2014including scene 1\u2014uses its own jointly generated endpoint latent as the future Guide. This takes priority over the legacy future_end_anchor toggle."
+          }
+        ],
+        "visual_cond_noise_aug": [
+          "FLOAT",
+          {
+            "default": 0.999,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.001,
+            "round": 0.001,
+            "tooltip": "Experimental Guide diagnostic. 0.999 is ComfyUI's current H3 default; try 0.995, then 0.990 to weaken the near-clean visual conditioning seen at early sampling steps. For causal diagnosis only, 0.000 keeps the same packed visual-condition rows and positions but replaces their latent content with seeded noise and removes their clean timestep pin. Core exposes one value per conditioning payload, so on continuation scenes it also affects character, keyframe, and motion references already present in that payload. It does not control an AV preserved prefix and is ignored by AV transition modes."
+          }
+        ],
+        "future_end_anchor": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Legacy Guide/AV research option. Reuse the final prepared predecessor-context latent step as one clean Guide immediately after the target timeline. In AV modes, the ordinary prefix remains inside the masked target latent while this separate suffix uses the exact prepared AV prefix geometry. It does not change the mask, scene length, or Loop Trim. This may retain background/camera composition but can pull the ending pose backward. When a Boundary Anchors registry is connected, its scene-specific endpoint replaces this copied predecessor pose regardless of this toggle."
+          }
+        ],
+        "lip_sync_voice": [
+          "AUDIO",
+          {
+            "tooltip": "Optional isolated vocal stem from MiniMax H3 Lip-Sync Options. Connect that node's voice output here; its companion options output goes to Generation Profile. The stem must align with the Project source track."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "state",
+        "conditioning",
+        "vae",
+        "latent"
+      ],
+      "optional": [
+        "audio_vae",
+        "model",
+        "drift_sigmas",
+        "boundary_anchors",
+        "visual_cond_noise_aug",
+        "future_end_anchor",
+        "lip_sync_voice"
+      ]
+    },
+    "output": [
+      "CONDITIONING",
+      "INT",
+      "BOOLEAN",
+      "LATENT",
+      "MODEL"
+    ],
+    "output_name": [
+      "conditioning",
+      "trim_frames",
+      "is_continuation",
+      "latent",
+      "model"
+    ],
+    "display_name": "MiniMax H3 Context Loop Context",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": false
+  },
+  "KSamplerSelect": {
+    "input": {
+      "required": {
+        "sampler_name": [
+          "COMBO",
+          {
+            "multiselect": false,
+            "options": [
+              "euler",
+              "euler_cfg_pp",
+              "euler_ancestral",
+              "euler_ancestral_cfg_pp",
+              "heun",
+              "heunpp2",
+              "exp_heun_2_x0",
+              "exp_heun_2_x0_sde",
+              "dpm_2",
+              "dpm_2_ancestral",
+              "lms",
+              "dpm_fast",
+              "dpm_adaptive",
+              "dpmpp_2s_ancestral",
+              "dpmpp_2s_ancestral_cfg_pp",
+              "dpmpp_sde",
+              "dpmpp_sde_gpu",
+              "dpmpp_2m",
+              "dpmpp_2m_cfg_pp",
+              "dpmpp_2m_sde",
+              "dpmpp_2m_sde_gpu",
+              "dpmpp_2m_sde_heun",
+              "dpmpp_2m_sde_heun_gpu",
+              "dpmpp_3m_sde",
+              "dpmpp_3m_sde_gpu",
+              "ddpm",
+              "lcm",
+              "ipndm",
+              "ipndm_v",
+              "deis",
+              "cfgpp_ud10_ab",
+              "res_multistep",
+              "res_multistep_cfg_pp",
+              "res_multistep_ancestral",
+              "res_multistep_ancestral_cfg_pp",
+              "gradient_estimation",
+              "gradient_estimation_cfg_pp",
+              "er_sde",
+              "seeds_2",
+              "seeds_3",
+              "sa_solver",
+              "sa_solver_pece",
+              "ddim",
+              "uni_pc",
+              "uni_pc_bh2",
+              "legacy_rk",
+              "rk",
+              "rk_beta",
+              "deis_3m_ode",
+              "deis_2m_ode",
+              "deis_3m",
+              "deis_2m",
+              "res_6s_ode",
+              "res_5s_ode",
+              "res_3s_ode",
+              "res_2s_ode",
+              "res_3m_ode",
+              "res_2m_ode",
+              "res_6s",
+              "res_5s",
+              "res_3s",
+              "res_2s",
+              "res_3m",
+              "res_2m"
+            ]
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "sampler_name"
+      ]
+    },
+    "output": [
+      "SAMPLER"
+    ],
+    "output_name": [
+      "SAMPLER"
+    ],
+    "display_name": null,
+    "category": "model/sampling/samplers",
+    "output_node": false
+  },
+  "MiniMaxH3ChainSegmentSave": {
+    "input": {
+      "required": {
+        "state": [
+          "H3_CHAIN_STATE",
+          {
+            "tooltip": "Current state from H3 Chain Current Shot."
+          }
+        ],
+        "images": [
+          "IMAGE",
+          {
+            "tooltip": "Delivered images AFTER MiniMax H3 Context Loop Trim. The frame count must exactly match this scene's planned delivered length."
+          }
+        ],
+        "sampled_latent": [
+          "LATENT",
+          {
+            "tooltip": "Raw sampler output for the current scene, before VAE decoding. Its compact AV streams are saved for checkpoint resume and audio context."
+          }
+        ]
+      },
+      "optional": {
+        "audio": [
+          "AUDIO",
+          {
+            "tooltip": "Delivered decoded audio AFTER MiniMax H3 Context Loop Trim with match_tail enabled. Connect Trim's audio output directly so its private AV overlap can also be checkpointed. Connect it in every audio mode to preserve H3's generated sound as WAV sidecars. Required for generated_audio and synchronized review. The bundled generation workflow already makes this connection; final assembly reads the saved sidecars without another audio wire."
+          }
+        ],
+        "images_with_overlap": [
+          "IMAGE",
+          {
+            "tooltip": "Blend-ready output from Loop Trim. Required only when Plan video_blend_frames is above 0. It contains the retained repeated head followed by the normal delivered frames and is saved as a separate disk-backed assembly artifact."
+          }
+        ],
+        "denoised_latent": [
+          "LATENT",
+          {
+            "tooltip": "Optional SamplerCustomAdvanced denoised_output. Saved beside the terminal sampler output so a deferred learned upscaler can prefer explicit clean x0 while older checkpoints remain usable."
+          }
+        ]
+      },
+      "hidden": {
+        "prompt": "PROMPT",
+        "extra_pnginfo": "EXTRA_PNGINFO",
+        "dynprompt": "DYNPROMPT",
+        "unique_id": "UNIQUE_ID"
+      }
+    },
+    "input_order": {
+      "required": [
+        "state",
+        "images",
+        "sampled_latent"
+      ],
+      "optional": [
+        "audio",
+        "images_with_overlap",
+        "denoised_latent"
+      ],
+      "hidden": [
+        "prompt",
+        "extra_pnginfo",
+        "dynprompt",
+        "unique_id"
+      ]
+    },
+    "output": [
+      "H3_CHAIN_SEGMENT",
+      "STRING"
+    ],
+    "output_name": [
+      "segment",
+      "status"
+    ],
+    "display_name": "MiniMax H3 Context Loop Segment + Checkpoint",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": true
+  },
+  "MiniMaxH3ImageToVideo": {
+    "input": {
+      "required": {
+        "clip": [
+          "CLIP",
+          {}
+        ],
+        "vae": [
+          "VAE",
+          {}
+        ],
+        "prompt": [
+          "STRING",
+          {
+            "multiline": true,
+            "dynamicPrompts": true
+          }
+        ],
+        "width": [
+          "INT",
+          {
+            "default": 1344,
+            "min": 32,
+            "max": 16384,
+            "step": 32
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 768,
+            "min": 32,
+            "max": 16384,
+            "step": 32
+          }
+        ],
+        "length": [
+          "INT",
+          {
+            "tooltip": "Frame count at 24 fps, snapped up to the model's 17k+5 grid (124 = ~5s; trained range is ~124-362, longer is untested)",
+            "default": 124,
+            "min": 5,
+            "max": 3600,
+            "step": 17
+          }
+        ]
+      },
+      "optional": {
+        "first_frame": [
+          "IMAGE",
+          {}
+        ],
+        "last_frame": [
+          "IMAGE",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "clip",
+        "vae",
+        "prompt",
+        "width",
+        "height",
+        "length"
+      ],
+      "optional": [
+        "first_frame",
+        "last_frame"
+      ]
+    },
+    "output": [
+      "CONDITIONING",
+      "LATENT"
+    ],
+    "output_name": [
+      "positive",
+      "LATENT"
+    ],
+    "display_name": "MiniMax H3 Image to Video",
+    "category": "model/conditioning/minimax",
+    "output_node": false
+  },
+  "MiniMaxH3ChainAssemble": {
+    "input": {
+      "required": {
+        "manifest": [
+          "H3_CHAIN_MANIFEST",
+          {
+            "tooltip": "Completed source or upscale manifest from Loop End or Manifest Load. Its format selects the correct verified segments and canonical final folder automatically."
+          }
+        ],
+        "audio_source": [
+          [
+            "plan",
+            "source",
+            "generated",
+            "none"
+          ],
+          {
+            "default": "plan",
+            "tooltip": "Keep plan for automatic audio: generated assembles checkpointed H3 sound, source recovers the track supplied once upstream, and none makes a silent MP4. The other choices are explicit assembly overrides."
+          }
+        ],
+        "filename": [
+          "STRING",
+          {
+            "default": "final",
+            "tooltip": "Final MP4 basename inside this chain's output folder. The .mp4 extension is added automatically. Supports date tokens such as %date:yyyy-MM-dd%. Existing files are preserved by adding _001, _002, and so on."
+          }
+        ],
+        "audio_bitrate": [
+          "INT",
+          {
+            "default": 256,
+            "min": 64,
+            "max": 512,
+            "tooltip": "AAC bitrate in kilobits per second for the final mux. It does not re-encode the saved H.264 video segments."
+          }
+        ]
+      },
+      "optional": {
+        "copy_to_output": [
+          "BOOLEAN",
+          {
+            "default": false,
+            "tooltip": "Also copy the completed MP4 out of the chain folder into the regular ComfyUI output tree."
+          }
+        ],
+        "output_subfolder": [
+          "STRING",
+          {
+            "default": "",
+            "tooltip": "Relative folder for the optional output copy. Empty means the output root. Nested folders and date tokens such as renders/%date:yyyy-MM-dd% are supported; the filename widget above still sets the MP4 name."
+          }
+        ],
+        "blend_schedule": [
+          "STRING",
+          {
+            "default": "plan",
+            "tooltip": "Assembly-only visual blend schedule. 'plan' uses the Plan's global value. A list such as 5,30 applies 5 frames at the first boundary and 30 at every later boundary. The final value repeats; extra values are ignored by a shorter partial manifest. This never reruns diffusion."
+          }
+        ],
+        "boundary_tone_match": [
+          [
+            "off",
+            "auto"
+          ],
+          {
+            "default": "off",
+            "tooltip": "Optional assembly-only boundary correction. auto compares the protected overlap with the first generated frames, detects a coherent exposure/contrast step, and applies a small capped tone curve only after that step. Accepted corrections are carried through later overlaps so they do not create a new seam. This never reruns diffusion."
+          }
+        ],
+        "color_stabilization": [
+          [
+            "off",
+            "scene_1_anchor"
+          ],
+          {
+            "default": "off",
+            "tooltip": "Optional assembly-only temporal grade. scene_1_anchor measures the first scene as a fixed color reference, applies no new change at a join, then gently ramps a capped exposure/saturation correction over 72 frames. It uses one assembly encode, never blends pixels for color, and does not affect motion or audio sync. Off preserves the existing stream-copy/blend behavior."
+          }
+        ],
+        "source_audio": [
+          "AUDIO",
+          {
+            "tooltip": "Legacy fallback for manifests created before Loop Start persisted its AUDIO. New manifests recover the original source track themselves; a redundant matching wire is harmless. The track is trimmed or safely silent-padded to the final duration."
+          }
+        ],
+        "source_timeline": [
+          "H3_SOURCE_TIMELINE",
+          {
+            "tooltip": "Primary 0.5 source-audio route. Usually this can be left unconnected because the manifest contains its path-backed recovery descriptor."
+          }
+        ],
+        "blend_video_vae": [
+          "VAE",
+          {
+            "tooltip": "Optional recovery-only MiniMax H3 video VAE. Connect the original VAE when blend_schedule requests more overlap than the saved blend MP4 retained. Assemble then re-decodes the existing checkpoint; it does not sample or regenerate the scene."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "manifest",
+        "audio_source",
+        "filename",
+        "audio_bitrate"
+      ],
+      "optional": [
+        "copy_to_output",
+        "output_subfolder",
+        "blend_schedule",
+        "boundary_tone_match",
+        "color_stabilization",
+        "source_audio",
+        "source_timeline",
+        "blend_video_vae"
+      ]
+    },
+    "output": [
+      "STRING"
+    ],
+    "output_name": [
+      "video_path"
+    ],
+    "display_name": "MiniMax H3 Context Loop Assemble",
+    "category": "conditioning/minimax/context_loop",
+    "output_node": true
+  },
+  "VAEDecodeAudio": {
+    "input": {
+      "required": {
+        "samples": [
+          "LATENT",
+          {}
+        ],
+        "vae": [
+          "VAE",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "samples",
+        "vae"
+      ]
+    },
+    "output": [
+      "AUDIO"
+    ],
+    "output_name": [
+      "AUDIO"
+    ],
+    "display_name": "VAE Decode Audio",
+    "category": "model/latent",
+    "output_node": false
+  },
+  "CLIPLoader": {
+    "input": {
+      "required": {
+        "clip_name": [
+          [
+            "MiniMax-H3/qwen3vl_32b_minimax_h3_int8_convrot.safetensors"
+          ]
+        ],
+        "type": [
+          [
+            "stable_diffusion",
+            "stable_cascade",
+            "sd3",
+            "stable_audio",
+            "mochi",
+            "ltxv",
+            "pixart",
+            "cosmos",
+            "lumina2",
+            "wan",
+            "hidream",
+            "chroma",
+            "ace",
+            "omnigen2",
+            "qwen_image",
+            "hunyuan_image",
+            "flux2",
+            "ovis",
+            "longcat_image",
+            "cogvideox",
+            "lens",
+            "pixeldit",
+            "ideogram4",
+            "boogu",
+            "krea2",
+            "joyimage",
+            "mage",
+            "minimax"
+          ]
+        ]
+      },
+      "optional": {
+        "device": [
+          [
+            "default",
+            "cpu"
+          ],
+          {
+            "advanced": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "clip_name",
+        "type"
+      ],
+      "optional": [
+        "device"
+      ]
+    },
+    "output": [
+      "CLIP"
+    ],
+    "output_name": [
+      "CLIP"
+    ],
+    "display_name": "Load CLIP",
+    "category": "model/loaders",
+    "output_node": false
+  },
+  "ModelAttentionBackend": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL"
+        ],
+        "attention": [
+          [
+            "pytorch attention",
+            "comfy kitchen attention"
+          ]
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "attention"
+      ]
+    },
+    "output": [
+      "MODEL"
+    ],
+    "output_name": [
+      "MODEL"
+    ],
+    "display_name": "ModelAttentionBackend",
+    "category": "model/patch",
+    "output_node": false
+  }
+}

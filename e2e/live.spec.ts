@@ -1,0 +1,87 @@
+import { test, expect, type Page } from '@playwright/test';
+let target = '';
+test.beforeAll(async ({ request }) => { target = (await (await request.get('/api/connection')).json()).target; });
+test.beforeEach(async ({ request }) => { await request.put('/api/connection', { data: { target } }); await request.post('/comfy/test/reset'); });
+async function attach(page: Page) {
+  await page.goto(`${target}/test/live`);
+  await page.waitForFunction(() => Boolean((window as any).testComfy));
+  await page.evaluate(() => { const item = (window as any).testComfy.graph._nodes.find((n: any) => n.id === '1700').widgets.find((w: any) => w.name === 'plan_json'); const plan = JSON.parse(item.value); plan.shots[0].prompt = 'Unsaved direction from ComfyUI'; item.value = JSON.stringify(plan); });
+  const opened = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open companion' }).click();
+  const companion = await opened;
+  await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible({ timeout: 15000 });
+  return companion;
+}
+const nativeDirection = (page: Page) => page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((n: any) => n.id === '1700').widgets.find((w: any) => w.name === 'plan_json').value).shots[0].prompt);
+test('attaches unsaved state, explicitly applies a prompt, queues natively, and exports the original canvas', async ({ page, request }) => {
+  const companion = await attach(page), errors: string[] = []; companion.on('pageerror', e => errors.push(e.message));
+  const direction = companion.getByRole('textbox', { name: 'Scene direction', exact: true });
+  await expect(direction).toHaveValue('Unsaved direction from ComfyUI');
+  await direction.fill('Companion direction');
+  await expect(companion.getByRole('button', { name: 'Queue in ComfyUI' })).toBeDisabled();
+  expect(await nativeDirection(page)).toBe('Unsaved direction from ComfyUI');
+  await companion.getByRole('button', { name: 'Apply to ComfyUI', exact: true }).click();
+  await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
+  expect(await nativeDirection(page)).toBe('Companion direction');
+  expect(await page.evaluate(() => (window as any).nativeCallbacks)).toBeGreaterThan(0);
+  await companion.getByRole('button', { name: 'Queue in ComfyUI' }).click();
+  await expect(companion.getByText('Queued', { exact: true })).toBeVisible();
+  const state = await (await request.get('/comfy/test/state')).json();
+  expect(state.submissions[0].client_id).toBe('native-comfy-client');
+  expect(state.submissions[0].extra_data.native_queue_hook).toBe(true);
+  const download = companion.waitForEvent('download'); await companion.getByRole('button', { name: 'Export workflow', exact: true }).click();
+  expect((await download).suggestedFilename()).toContain('Live unsaved');
+  expect(await companion.evaluate(() => localStorage.getItem('sceneweaver.project.v1'))).toBeNull();
+  expect(errors).toEqual([]);
+});
+test('preserves a draft on conflicting native edits and blocks writes after a tab switch', async ({ page }) => {
+  const companion = await attach(page), direction = companion.getByRole('textbox', { name: 'Scene direction', exact: true });
+  await direction.fill('Preserve this local draft');
+  await page.evaluate(() => { const item = (window as any).testComfy.graph._nodes.find((n: any) => n.id === '1700').widgets.find((w: any) => w.name === 'plan_json'); const plan = JSON.parse(item.value); plan.shots[0].prompt = 'Changed in ComfyUI'; item.value = JSON.stringify(plan); });
+  await expect(companion.getByText('Concurrent edit detected', { exact: true })).toBeVisible();
+  await expect(direction).toHaveValue('Preserve this local draft');
+  await expect(companion.getByRole('button', { name: 'Apply to ComfyUI', exact: true })).toBeDisabled();
+  expect(await nativeDirection(page)).toBe('Changed in ComfyUI');
+  await companion.getByRole('button', { name: 'Reload from ComfyUI' }).click();
+  await expect(direction).toHaveValue('Changed in ComfyUI');
+  await page.evaluate(() => { (window as any).testComfy.extensionManager.workflow.activeWorkflow = { path: 'workflows/Other.json', filename: 'Other.json' }; });
+  await expect(companion.getByText('ComfyUI tab changed', { exact: true })).toBeVisible();
+  await expect(companion.getByRole('button', { name: 'Queue in ComfyUI' })).toBeDisabled();
+  await companion.getByRole('button', { name: 'Attach current tab' }).click();
+  await expect(companion.getByRole('textbox', { name: 'Project name' })).toHaveValue('Other.json');
+});
+test('manages the native project catalog and reads saved checkpoint metadata', async ({ page }) => {
+  const companion = await attach(page);
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await expect(companion.getByRole('textbox', { name: 'Tag for hero', exact: true })).toBeEnabled();
+  await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('lead');
+  await companion.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(companion.getByRole('textbox', { name: 'Tag for lead', exact: true })).toHaveValue('lead');
+  expect(await page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((n: any) => n.id === '9000').widgets.find((w: any) => w.name === 'catalog_json').value).assets[0].tag)).toBe('lead');
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Takes', exact: true }).click();
+  await expect(companion.getByText('Active take', { exact: true })).toBeVisible();
+  await expect(companion.getByText('Seed 18446744073709551615', { exact: true })).toBeVisible();
+  const download = companion.waitForEvent('download'); await companion.getByRole('button', { name: 'Export checkpoint list' }).click();
+  expect((await download).suggestedFilename()).toBe('sceneweaver_first_film.checkpoints.json');
+  await companion.screenshot({ path: 'test-results/live-companion.png', fullPage: true });
+});
+test('follows an already queued project and receives progress from its original browser client', async ({ page, request }) => {
+  const prompt = await (await request.get('/comfy/test/starter')).json();
+  const queued = await (await request.post('/comfy/prompt', { data: { prompt, client_id: 'native-comfy-client' } })).json();
+  const companion = await attach(page);
+  await companion.getByRole('button', { name: /Render queue/ }).click();
+  await expect(companion.getByText('Queued', { exact: true })).toBeVisible();
+  await page.evaluate(async id => { const { api } = await import('/scripts/api.js'); api.dispatchEvent(new CustomEvent('progress', { detail: { prompt_id: id, value: 7, max: 10, node: '1701' } })); }, queued.prompt_id);
+  await expect(companion.getByText('Rendering', { exact: true })).toBeVisible();
+  await expect(companion.locator('.job-card progress')).toHaveAttribute('value', '0.7');
+});
+test('ignores unpaired messages and preserves drafts when the ComfyUI page closes', async ({ page }) => {
+  const companion = await attach(page);
+  await companion.evaluate(() => window.postMessage({ protocol: 'sceneweaver.live.v1', session: 'wrong-session', kind: 'snapshot', snapshot: { binding: 'wrong', name: 'Injected workflow', nodes: {} } }, location.origin));
+  await expect(companion.getByRole('textbox', { name: 'Project name' })).toHaveValue('Live unsaved.json');
+  await companion.getByRole('textbox', { name: 'Scene direction', exact: true }).fill('Keep after disconnect');
+  await page.close();
+  await expect(companion.getByText('Waiting for the ComfyUI tab', { exact: true })).toBeVisible({ timeout: 8000 });
+  await expect(companion.getByRole('button', { name: 'Apply to ComfyUI', exact: true })).toBeDisabled();
+  await expect(companion.getByRole('textbox', { name: 'Scene direction', exact: true })).toHaveValue('Keep after disconnect');
+  await expect(companion.getByRole('button', { name: 'Export draft', exact: true })).toBeEnabled();
+});
