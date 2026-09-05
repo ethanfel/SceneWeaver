@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.1** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.2** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -55,8 +55,9 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 | Task | How it works |
 | --- | --- |
 | See the sequence | Select scenes in the bin or timeline. Saved H3 trims, placements, gaps, and chosen alternate pictures are reflected. Unfinished scenes use labeled raw estimates. |
+| Play the whole cut | **Sequence** is the default: Play or Space advances through saved clips and timeline gaps. Scrub the full cut or jump between scenes. Unrendered scenes show a timed placeholder; playback stops at the sequence end. |
 | Hear audio and see captions | The viewer pairs raw/alternate pictures with generated WAV sidecars, synchronizes the saved Plan Studio soundtrack, and overlays its selected SRT/LRC lyrics. Use the generated-audio/source-soundtrack switches, volume, and CC controls. |
-| Compare scene takes | The **Scene take** selector previews the final cut, its generated base, or compatible picture alternates. **All takes** opens the revision list for that scene. These preview choices do not activate a different H3 checkpoint. |
+| Compare scene takes | The **Scene take** selector previews the final cut, its generated base, or compatible picture alternates. **All takes** opens the revision list for that scene. **Clip** mode stops at the selected scene’s end; selecting a base or alternate take enters this mode. Return to **Sequence** to watch the saved final-cut choices. These preview choices do not activate a different H3 checkpoint. |
 | Edit prompts | Change the scene direction, shared direction, seeds, frame counts, or scalar node settings. **Apply to ComfyUI** writes the draft into the attached graph through native widget callbacks. |
 | Handle simultaneous edits | Disjoint widget edits merge. Changes to the same widget raise a conflict and preserve the local draft. Export the draft before **Reload from ComfyUI** to keep both versions. A plan JSON widget is one conflict unit. |
 | Run the workflow | **Queue in ComfyUI** uses the original frontend queue path, retaining custom serialization, subgraphs, ownership proofs, and queue hooks. Apply the draft first. |
@@ -72,7 +73,7 @@ Applied changes live in the ComfyUI graph; save that workflow through ComfyUI as
 
 ## Current boundaries
 
-- The timeline edits the generation sequence. Trimming rendered media, transitions, audio mixing, arbitrary track placement, and independent movie export are future work. Sequence timing applies saved H3 trims and placements, combines delivered clips with raw estimates, and does not resolve every H3 continuity policy for unfinished scenes in advance. Playback previews one selected scene at a time.
+- The timeline edits the generation sequence. Trimming rendered media, transitions, audio mixing, arbitrary track placement, and independent movie export are future work. Sequence timing applies saved H3 trims and placements, combines delivered clips with raw estimates, and does not resolve every H3 continuity policy for unfinished scenes in advance. Sequence playback preserves gaps and unfinished scenes. It ends at the last planned scene, even if the source soundtrack is longer. Remote clip loading can briefly buffer at cuts; this is a browser preview, not a frame-exact assembled export.
 - Subtitle text, offset, and soundtrack selection come from the saved H3 project. Change those settings in Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
 - Native reference-slot binding, folder organization, asset deletion, checkpoint activation/deletion, and branch recovery remain in ComfyUI. The companion provides navigation to the relevant native nodes.
 - A live snapshot exposes named scalar widgets and links for inspection, including nested graph nodes. It is not an API execution graph. Connected inputs and native catalog/proof fields cannot be overwritten through generic input editing. Custom node controls with no scalar widget remain native.
@@ -104,7 +105,7 @@ To use an installed browser:
 SCENEWEAVER_CHROMIUM=/path/to/chrome npm run test:e2e
 ```
 
-Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, and selected alternate pictures. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
+Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures, continuous cuts and gaps, unrendered scenes, pause/seek/restart, and clip isolation. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
 
 ## Sources
 

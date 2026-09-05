@@ -15,7 +15,10 @@ export function Timeline({ plan, inputs, checkpoints, editorial, selected, selec
     const left = width + gap; width = left + clipWidth; previousEnd = segment.start + segment.duration;
     return { ...segment, gap, width: clipWidth, left };
   });
-  const active = layout.find(item => item.index === selected);
+  const active = layout.find(item => currentTime >= item.start && currentTime < item.start + item.duration);
+  const following = layout.find(item => item.start > currentTime);
+  const playhead = active ? active.left + (currentTime - active.start) / active.duration * active.width
+    : following ? following.left - (following.start - currentTime) * 23 * zoom : width;
   return <section className="timeline panel">
     <div className="timeline-toolbar"><div className="timeline-name"><Film size={15}/><strong>Scene sequence</strong><ChevronRight size={13}/><span>{plan?.shots.length || 0} scenes</span></div><div className="timeline-tools"><MousePointer2 size={14}/><span className="divider"/><button className="icon-button" aria-label="Zoom out timeline" onClick={() => setZoom(v => Math.max(.4, v - .2))}><Minus size={15}/></button><input aria-label="Timeline zoom" type="range" min=".4" max="3" step=".1" value={zoom} onChange={e => setZoom(Number(e.target.value))}/><button className="icon-button" aria-label="Zoom in timeline" onClick={() => setZoom(v => Math.min(3, v + .2))}><Plus size={15}/></button><button className="icon-button" aria-label="Reset timeline zoom" onClick={() => setZoom(1)}><Maximize2 size={14}/></button></div></div>
     <div className="timeline-grid"><div className="track-labels"><div className="clock-label">24 FPS</div><div><span className="track-badge">V1</span><span>H3 scenes<small>Saved presentation</small></span><Film size={14}/></div><div><span className="track-badge audio">A1</span><span>Generated audio<small>Linked to picture</small></span><Volume2 size={14}/></div></div>
@@ -28,7 +31,7 @@ export function Timeline({ plan, inputs, checkpoints, editorial, selected, selec
         </button>;
       })}<button className="add-timeline" onClick={add} disabled={!plan} aria-label="Add scene"><Plus size={19}/></button></div>
       <div className="audio-track">{layout.map(item => <div key={item.index} style={{ width: item.width, marginLeft: item.gap }}><Volume2 size={13}/><span>{item.estimated ? 'Audio follows render' : 'Generated clip audio'}</span></div>)}</div>
-      {active && <div className="playhead" style={{ left: active.left + Math.min(1, Math.max(0, currentTime) / Math.max(1 / 24, active.duration)) * active.width }}><span/></div>}
+      {layout.length > 0 && <div className="playhead" style={{ left: Math.max(0, playhead) }}><span/></div>}
     </div></div></div>
     <div className="timeline-footer"><span>H3’s saved trims, placements, and final-cut choices are shown here.</span><span>Sequence {timecode(previousEnd)}{segments.some(item => item.estimated) ? ' · includes raw estimates' : ' · delivered clips'}</span></div>
   </section>;

@@ -2,6 +2,23 @@ import type { Checkpoint, Editorial, Plan, PlaybackSegment, PreviewMedia, Revisi
 import { checkpointFor, rawFrames } from './h3';
 import { mediaUrl } from './api';
 
+export type SequenceEntry = PlaybackSegment & { media: PreviewMedia };
+export type SequenceSpan = { start: number; duration: number; entry?: SequenceEntry };
+export function sequenceDuration(entries: SequenceEntry[]) {
+  const last = entries.at(-1); return last ? last.start + last.duration : 0;
+}
+// Gaps occupy real timeline time. At the final boundary retain the last frame.
+export function sequenceSpan(entries: SequenceEntry[], seconds: number): SequenceSpan | undefined {
+  let end = 0;
+  for (const entry of entries) {
+    if (seconds < entry.start) return { start: end, duration: entry.start - end };
+    end = entry.start + entry.duration;
+    if (seconds < end) return { start: entry.start, duration: entry.duration, entry };
+  }
+  const entry = entries.at(-1);
+  return entry ? { start: entry.start, duration: entry.duration, entry } : undefined;
+}
+
 export function checkpointMedia(checkpoint: Checkpoint, usePresentation = true): PreviewMedia {
   const replacement = usePresentation && checkpoint.presentation_video;
   const video = replacement || checkpoint.preview_video || checkpoint.video;

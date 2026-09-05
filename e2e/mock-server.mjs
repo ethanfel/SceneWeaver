@@ -8,7 +8,7 @@ const app = express(); app.use(express.json({ limit: '30mb' }));
 const schemas = JSON.parse(readFileSync('public/examples/h3-schemas.json'));
 const starter = JSON.parse(readFileSync('public/examples/h3-starter.api.json'));
 const upstream = http.createServer(app), ws = new WebSocketServer({ server: upstream });
-let pending = [], reviews = [], decisions = [], submissions = [], playback = false;
+let pending = [], reviews = [], decisions = [], submissions = [], playback = false, adjacent = false;
 const media = filename => ({ filename, subfolder: 'test', type: 'output' });
 const baseTake = { scene: 1, scene_id: 'the_arrival', revision: 'base', active: true, ready: true, raw_frames: 124, delivered_frames: 108, seed: '18446744073709551615', steps: 12, prompt: 'Saved direction', lineage_status: 'current', dependencies: [], video: media('base.webm'), audio: media('base.wav') };
 const alternate = { ...baseTake, revision: 'final-alt', active: false, take_kind: 'editorial_alternate', alternate_of_revision: 'base', used_in_final_cut: true, video: media('final-alt.webm') };
@@ -28,11 +28,11 @@ app.get('/userdata/{*path}', (_req, res) => res.json(starter));
 app.get('/history/:id', (_req, res) => res.json({}));
 app.get('/minimax_h3_context_loop/reviews', (_req, res) => res.json({ reviews }));
 app.get('/minimax_h3_context_loop/runs', (_req, res) => res.json({ runs: [] }));
-app.get('/minimax_h3_context_loop/checkpoints', (_req, res) => res.json(playback ? { checkpoints: playbackCheckpoints, revisions: [baseTake, alternate, secondTake], editorial } : { checkpoints: [], revisions: [{ ...baseTake, revision: 'take-1', video: undefined, audio: undefined }] }));
+app.get('/minimax_h3_context_loop/checkpoints', (_req, res) => res.json(playback ? { checkpoints: playbackCheckpoints, revisions: [baseTake, alternate, secondTake], editorial: adjacent ? { ...editorial, placements: [{ scene_id: 'a_moment_of_stillness', start_frame: 48 }, { scene_id: 'the_departure', start_frame: 156 }] } : editorial } : { checkpoints: [], revisions: [{ ...baseTake, revision: 'take-1', video: undefined, audio: undefined }] }));
 app.get('/minimax_h3_context_loop/plan-studio/presentation', (_req, res) => res.json({ run_name: 'sceneweaver_first_film', token: 'mock-audio-token', source_audio: { available: playback, seek_seconds: 2 } }));
 app.get('/minimax_h3_context_loop/plan-studio/source-audio', (_req, res) => res.sendFile(resolve('e2e/fixtures/audio.wav')));
 app.get('/view', (req, res) => res.sendFile(resolve('e2e/fixtures', String(req.query.filename).endsWith('.wav') ? 'audio.wav' : 'silent-clip.webm')));
-app.post('/test/playback', (_req, res) => { playback = true; res.json({}); });
+app.post('/test/playback', (req, res) => { playback = true; adjacent = Boolean(req.body?.adjacent); res.json({}); });
 app.post('/prompt', (req, res) => {
   submissions.push(req.body); const prompt_id = `test-prompt-${submissions.length}`; pending.push([1, prompt_id, req.body.prompt, {}, []]);
   res.json({ prompt_id, number: 1 }); broadcast('status', {});
@@ -52,7 +52,7 @@ app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock
 app.get('/minimax_h3_context_loop/project-assets', (_req, res) => res.json(catalog()));
 app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
 app.get('/minimax_h3_context_loop/project-assets/media', (_req, res) => res.type('image/svg+xml').send('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#334139"/><circle cx="120" cy="65" r="25" fill="#829589"/></svg>'));
-app.post('/test/reset', (_req, res) => { pending = []; reviews = []; submissions = []; decisions = []; playback = false; assets[0].tag = 'hero'; res.json({}); });
+app.post('/test/reset', (_req, res) => { pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; res.json({}); });
 app.post('/test/disconnect', (_req, res) => { ws.clients.forEach(client => client.close()); res.json({}); });
 upstream.listen(0, '127.0.0.1', () => {
   const { server } = createApp({ target: `http://127.0.0.1:${upstream.address().port}` }); server.listen(4319, '127.0.0.1');

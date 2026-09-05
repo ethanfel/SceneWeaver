@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkpointMedia, parseSubtitles, playbackSegments, revisionMedia, subtitleAt } from './playback';
+import { checkpointMedia, parseSubtitles, playbackSegments, revisionMedia, sequenceDuration, sequenceSpan, subtitleAt } from './playback';
 import type { Checkpoint, Revision } from '../types';
 const file = (filename: string) => ({ filename, subfolder: 'test', type: 'output' });
 const checkpoint: Checkpoint = { scene: 1, scene_id: 'one', revision: 'base', ready: true, raw_frames: 124, delivered_frames: 108, video: file('base.mp4'), audio: file('base.wav'), presentation_video: file('alternate.mp4'), presentation_revision: 'alternate' };
@@ -29,6 +29,17 @@ describe('H3 presentation playback', () => {
   });
   it('does not match old checkpoints to a renamed scene', () => {
     expect(playbackSegments({ shots: [{ id: 'renamed', length: 124 }] }, {}, [checkpoint])[0]).toMatchObject({ estimated: true, duration: 124 / 24 });
+  });
+  it('locates leading gaps, cuts, missing footage, and the final frame without skipping time', () => {
+    const entries = [{ index: 1, id: 'two', start: 2, duration: 3, estimated: false, media: checkpointMedia(checkpoint) },
+      { index: 0, id: 'one', start: 7, duration: 4, estimated: true, media: { url: '', name: 'one' } }];
+    expect(sequenceSpan(entries, 0)).toEqual({ start: 0, duration: 2 });
+    expect(sequenceSpan(entries, 2)?.entry?.id).toBe('two');
+    expect(sequenceSpan(entries, 5)).toEqual({ start: 5, duration: 2 });
+    expect(sequenceSpan(entries, 7)?.entry?.media.url).toBe('');
+    expect(sequenceSpan(entries, 11)?.entry?.id).toBe('one');
+    expect(sequenceDuration(entries)).toBe(11);
+    expect(sequenceDuration([])).toBe(0); expect(sequenceSpan([], 0)).toBeUndefined();
   });
 });
 describe('timed project captions', () => {

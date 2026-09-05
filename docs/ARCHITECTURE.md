@@ -37,6 +37,10 @@ Checkpoint reads retain H3's editorial record, audio sidecars, picture alternate
 
 The saved Plan Studio presentation supplies a source-audio token and seek offset; project audio assets supply timed lyrics selected by the editorial subtitle settings. Audio and captions use the scene's editorial start after saved trims and placements. Viewer switches change monitoring only. They do not write source audio settings, subtitle settings, or alternate activation back to H3.
 
+Sequence playback follows the sorted editorial segments and retains gaps as timeline time. Rendered footage drives the clock from the current video; gaps, unrendered scenes, and a short video's remaining planned duration use an animation clock. The source audio element survives scene changes; departing picture and generated-audio elements are paused. Buffering freezes the picture clock and pauses accompanying audio. The global scrubber and timeline playhead share the same sequence position, including in gaps.
+
+Manual scene navigation pauses playback. Take previews are isolated in Clip mode; returning to Sequence restores the saved final-cut choices. Changing the saved cut pauses an active sequence for review. Playback stops at the last planned scene, and replay starts at zero. This browser transport does not assemble media or promise frame-exact, gapless delivery between remote files.
+
 ## Main modules
 
 - `public/integrations/bridge-core.mjs`: widget validation, draft diffing, and reconciliation shared by the browser adapter and UI.
@@ -54,7 +58,7 @@ The saved Plan Studio presentation supplies a source-audio token and seek offset
 
 Attach representative existing H3 projects with unsaved changes, nested graphs, Get/Set routing, active review gates, and long-running renders. Verify native Plan/Carousel synchronization, prompt edits, queue serialization, reconnect behavior, media playback, and server-side ownership refusal against the installed H3 version.
 
-Then add reference-slot assignment and folder management, explicit checkpoint/branch operations with dependency previews, continuous sequence playback, and final-assembly controls. Capability detection must hide unsupported mutations rather than invent protocol compatibility. Native ComfyUI remains an accessible route for every advanced operation.
+Then add reference-slot assignment and folder management, explicit checkpoint/branch operations with dependency previews, and final-assembly controls. Capability detection must hide unsupported mutations rather than invent protocol compatibility. Native ComfyUI remains an accessible route for every advanced operation.
 
 ## Later: standalone editor
 
