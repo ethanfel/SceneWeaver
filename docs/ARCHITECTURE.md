@@ -31,6 +31,12 @@ Asset updates verify original displayed fields before submitting. Uploads put pr
 
 Checkpoints are read from H3's graph-enabled endpoint. SceneWeaver shows revisions, active takes, delivered length, prompt, seed, and dependencies, and exports media or metadata. Activation, deletion, dependency repair, and branch changes remain native until a versioned adapter and representative production trials cover their effects.
 
+## Presentation playback
+
+Checkpoint reads retain H3's editorial record, audio sidecars, picture alternates, and selected presentation video. The viewer prefers the saved final-cut picture, pairs silent pictures with the appropriate base WAV, and avoids doubling sound already muxed into review previews. Archived picture alternates resolve audio from their base revision.
+
+The saved Plan Studio presentation supplies a source-audio token and seek offset; project audio assets supply timed lyrics selected by the editorial subtitle settings. Audio and captions use the scene's editorial start after saved trims and placements. Viewer switches change monitoring only. They do not write source audio settings, subtitle settings, or alternate activation back to H3.
+
 ## Main modules
 
 - `public/integrations/bridge-core.mjs`: widget validation, draft diffing, and reconciliation shared by the browser adapter and UI.
@@ -38,6 +44,7 @@ Checkpoints are read from H3's graph-enabled endpoint. SceneWeaver shows revisio
 - [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion): separately maintained Python registration stub and browser launch button. It loads the live bridge from the running SceneWeaver app, keeping the bridge protocol matched to the UI.
 - `src/hooks/useLiveWorkflow.ts`: verified parent messages, request acknowledgments/timeouts, and connection state.
 - `src/hooks/useComfy.ts`: remote discovery, job reconciliation, reviews, checkpoints, history, and scoped queue controls.
+- `src/lib/playback.ts`: media selection, subtitle parsing, and editorial timing. `PreviewPlayer.tsx` synchronizes picture, generated audio, source soundtrack, and captions.
 - `src/components/ProjectPanel.tsx`: project asset edits and take inspection, with stale-response cancellation.
 - `src/components/Inspector.tsx`, `Timeline.tsx`, `ReviewPanel.tsx`: scene settings, generation sequence, and H3 review actions.
 - `src/lib/workflow.ts`: detached imports/exports, supported canvas conversion, validation, and exact integer reading.
@@ -47,7 +54,7 @@ Checkpoints are read from H3's graph-enabled endpoint. SceneWeaver shows revisio
 
 Attach representative existing H3 projects with unsaved changes, nested graphs, Get/Set routing, active review gates, and long-running renders. Verify native Plan/Carousel synchronization, prompt edits, queue serialization, reconnect behavior, media playback, and server-side ownership refusal against the installed H3 version.
 
-Then add reference-slot assignment and folder management, explicit checkpoint/branch operations with dependency previews, accurate upstream presentation timing, source-audio alignment, and final-assembly controls. Capability detection must hide unsupported mutations rather than invent protocol compatibility. Native ComfyUI remains an accessible route for every advanced operation.
+Then add reference-slot assignment and folder management, explicit checkpoint/branch operations with dependency previews, continuous sequence playback, and final-assembly controls. Capability detection must hide unsupported mutations rather than invent protocol compatibility. Native ComfyUI remains an accessible route for every advanced operation.
 
 ## Later: standalone editor
 

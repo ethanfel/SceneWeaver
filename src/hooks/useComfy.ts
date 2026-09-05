@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Checkpoint, ComfyEvent, MediaFile, Queue, Review, Run, Schemas, Workflow } from '../types';
+import type { Checkpoint, Editorial, ComfyEvent, MediaFile, Queue, Review, Run, Schemas, Workflow } from '../types';
 import { comfy, H3, post, request } from '../lib/api';
 import { parseJSON } from '../lib/workflow';
 
@@ -17,6 +17,7 @@ export function useComfy(runName: string, followProject = false) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [editorial, setEditorial] = useState<Editorial | null>(null);
   const [outputs, setOutputs] = useState<MediaFile[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [events, setEvents] = useState<string[]>([]);
@@ -57,10 +58,10 @@ export function useComfy(runName: string, followProject = false) {
   }, []);
   const refreshCheckpoints = useCallback(async () => {
     const name = runRef.current, generation = connectionGeneration.current;
-    if (!name) { setCheckpoints([]); return; }
+    if (!name) { setCheckpoints([]); setEditorial(null); return; }
     try {
-      const result = await comfy<{ checkpoints: Checkpoint[] }>(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`);
-      if (runRef.current === name && generation === connectionGeneration.current) setCheckpoints(result.checkpoints || []);
+      const result = await comfy<{ checkpoints: Checkpoint[]; editorial?: Editorial }>(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`);
+      if (runRef.current === name && generation === connectionGeneration.current) { setCheckpoints(result.checkpoints || []); setEditorial(result.editorial || null); }
     } catch (e) { if (generation === connectionGeneration.current) setError(String(e)); }
   }, []);
   const loadHistory = useCallback(async (id: string) => {
@@ -84,7 +85,7 @@ export function useComfy(runName: string, followProject = false) {
   const connect = useCallback(async (url?: string) => {
     const generation = ++connectionGeneration.current;
     setConnecting(true); setConnected(false); setSocketOnline(false); setError('');
-    setSchemas({}); setReviews([]); setQueue(emptyQueue); setRuns([]); setCheckpoints([]); setOutputs([]); setJobs([]); tracked.current.clear();
+    setSchemas({}); setReviews([]); setQueue(emptyQueue); setRuns([]); setCheckpoints([]); setEditorial(null); setOutputs([]); setJobs([]); tracked.current.clear();
     try {
       const config = await request<{ target: string }>('/api/connection', url ? { method: 'PUT', body: JSON.stringify({ target: url }) } : undefined);
       setTarget(config.target);
@@ -111,7 +112,7 @@ export function useComfy(runName: string, followProject = false) {
     if (!connected) return;
     try { sessionStorage.setItem(`sceneweaver.jobs:${target}`, JSON.stringify(jobs.slice(0, 100))); } catch { /* Do not interrupt a live render when session storage is full. */ }
   }, [jobs, target, connected]);
-  useEffect(() => { setCheckpoints([]); if (connected) { void refreshCheckpoints(); if (followProject) void refresh(); } }, [runName, connected, followProject, refresh, refreshCheckpoints]);
+  useEffect(() => { setCheckpoints([]); setEditorial(null); if (connected) { void refreshCheckpoints(); if (followProject) void refresh(); } }, [runName, connected, followProject, refresh, refreshCheckpoints]);
   useEffect(() => {
     if (!connected) return;
     let disposed = false, socket: WebSocket, timer: ReturnType<typeof setTimeout>;
@@ -174,5 +175,5 @@ export function useComfy(runName: string, followProject = false) {
     await refresh();
   };
   const receiveEvent = useCallback((event: ComfyEvent) => eventReceiver.current(event), []);
-  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent };
+  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints, editorial, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent };
 }
