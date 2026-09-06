@@ -1,0 +1,115 @@
+import { test, expect, type Page } from '@playwright/test';
+let target = '';
+test.beforeAll(async ({ request }) => { target = (await (await request.get('/api/connection')).json()).target; });
+test.beforeEach(async ({ request }) => { await request.put('/api/connection', { data: { target } }); await request.post('/comfy/test/reset'); });
+async function openGeneration(page: Page, channel = 'film A') {
+  await page.goto(`${target}/test/live`);
+  await page.waitForFunction(() => Boolean((window as any).testComfy));
+  await page.evaluate(value => { const graph = (window as any).testComfy.graph; graph._nodes.push({ id: 'relay', type: 'PreviewRelay', graph, widgets: [{ name: 'channel', value }], inputs: [] }); }, channel);
+  const opened = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open companion' }).click();
+  const companion = await opened;
+  await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Generation', exact: true }).click();
+  return companion;
+}
+test('explains the optional Docker installation without changing or queuing the workflow', async ({ page, request }) => {
+  const companion = await openGeneration(page);
+  await expect(companion.getByText('PreviewRelay is not installed on the connected ComfyUI server.')).toBeVisible();
+  await expect(companion.getByRole('link', { name: 'ComfyUI-PreviewRelay', exact: true })).toHaveAttribute('href', 'https://github.com/drozbay/ComfyUI-PreviewRelay');
+  expect((await (await request.get('/comfy/test/state')).json()).submissions).toHaveLength(0);
+});
+test('discovers the live workflow channel and restores animated media and audio mid-generation', async ({ page, request }) => {
+  await request.post('/comfy/test/relay/install');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 3, audio: true } });
+  const companion = await openGeneration(page), errors: string[] = [];
+  companion.on('pageerror', error => errors.push(error.message));
+  await expect(companion.getByRole('combobox', { name: 'PreviewRelay channel' })).toHaveValue('film A');
+  await expect(companion.getByAltText('Generation sample at step 3')).toBeVisible();
+  await expect.poll(() => companion.getByAltText('Generation sample at step 3').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(160);
+  await expect(companion.locator('.generation-stats')).toContainText('3 / 12');
+  await expect(companion.locator('.generation-stats')).toContainText('1.50 s');
+  expect(await companion.getByTestId('relay-audio').evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true);
+  await companion.getByRole('button', { name: 'Enable sample audio' }).click();
+  await expect.poll(() => companion.getByTestId('relay-audio').evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false);
+  const oldUrl = await companion.getByAltText('Generation sample at step 3').getAttribute('src');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'unrelated', step: 9 } });
+  await expect(companion.getByAltText('Generation sample at step 3')).toHaveAttribute('src', oldUrl!);
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 4, video: true, audio: true } });
+  await expect(companion.getByTestId('relay-stage').locator('video')).toBeVisible();
+  await expect(companion.getByText('Latest sample · step 4', { exact: true })).toBeVisible();
+  await expect.poll(() => companion.getByTestId('relay-stage').locator('video').evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(0);
+  await expect.poll(() => companion.getByTestId('relay-audio').evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false);
+  await expect(companion.getByRole('alert')).not.toBeVisible();
+  expect(await companion.evaluate(async url => { try { await fetch(url!); return false; } catch { return true; } }, oldUrl)).toBe(true);
+  await companion.getByTestId('relay-audio').evaluate(audio => { (window as any).sampleAudio = audio; });
+  await companion.screenshot({ path: 'test-results/generation-preview.png', fullPage: true });
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Viewer', exact: true }).click();
+  expect(await companion.evaluate(() => (window as any).sampleAudio.paused)).toBe(true);
+  expect(errors).toEqual([]);
+});
+test('clears a previous run on reset and recovers the latest sample after a socket reconnect', async ({ page, request }) => {
+  await request.post('/comfy/test/relay/install');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 10 } });
+  const companion = await openGeneration(page);
+  await expect(companion.getByAltText('Generation sample at step 10')).toBeVisible();
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', reset: true } });
+  await expect(companion.getByRole('heading', { name: 'Waiting for a sampling preview' })).toBeVisible();
+  await companion.getByRole('button', { name: 'Refresh generation preview' }).click();
+  await expect(companion.getByAltText('Generation sample at step 10')).not.toBeVisible();
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 1, seq: 1 } });
+  await expect(companion.getByAltText('Generation sample at step 1')).toBeVisible();
+  await request.post('/comfy/test/disconnect');
+  await expect(companion.getByText('Preview disconnected · reconnecting', { exact: true })).toBeVisible();
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 2, notify: false } });
+  await expect(companion.getByAltText('Generation sample at step 2')).toBeVisible({ timeout: 10000 });
+});
+test('coalesces notifications and discards a delayed response after switching channels', async ({ page, request }) => {
+  await request.post('/comfy/test/relay/install');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 1 } });
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film B', step: 7 } });
+  const companion = await openGeneration(page);
+  await expect(companion.getByAltText('Generation sample at step 1')).toBeVisible();
+  let release!: () => void, seen!: () => void;
+  let gate = new Promise<void>(resolve => { release = resolve; }), received = new Promise<void>(resolve => { seen = resolve; });
+  let count = 0;
+  await companion.route('**/comfy/preview_relay/media?channel=film+A', async route => {
+    count++; const response = await route.fetch(); seen(); await gate; await route.fulfill({ response }).catch(() => {});
+  });
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 2 } }); await received;
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 3 } });
+  expect(count).toBe(1); release();
+  await expect(companion.getByAltText('Generation sample at step 3')).toBeVisible();
+  gate = new Promise<void>(resolve => { release = resolve; }); received = new Promise<void>(resolve => { seen = resolve; });
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 4 } }); await received;
+  await companion.getByRole('combobox', { name: 'PreviewRelay channel' }).fill('film B');
+  await companion.getByRole('button', { name: 'Watch', exact: true }).click();
+  await expect(companion.getByAltText('Generation sample at step 7')).toBeVisible();
+  release(); await companion.waitForTimeout(200);
+  await expect(companion.getByAltText('Generation sample at step 7')).toBeVisible();
+  await expect(companion.getByRole('link', { name: 'Open PreviewRelay' })).toHaveAttribute('href', `${target}/preview_relay?channel=film+B`);
+});
+test('reports incompatible preview endpoints and can retry after they recover', async ({ page, request }) => {
+  await request.post('/comfy/test/relay/install');
+  const companion = await openGeneration(page);
+  await companion.route('**/comfy/preview_relay/state?*', route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"Missing PreviewRelay API"}' }));
+  await companion.getByRole('button', { name: 'Refresh generation preview' }).click();
+  await expect(companion.getByRole('alert')).toContainText('Missing PreviewRelay API');
+  await companion.unroute('**/comfy/preview_relay/state?*');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 2 } });
+  await companion.getByRole('button', { name: 'Refresh generation preview' }).click();
+  await expect(companion.getByAltText('Generation sample at step 2')).toBeVisible();
+  await expect(companion.getByRole('alert')).not.toBeVisible();
+});
+
+test('pauses the channel feed when the native workflow tab changes', async ({ page, request }) => {
+  await request.post('/comfy/test/relay/install');
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 1 } });
+  const companion = await openGeneration(page);
+  await expect(companion.getByAltText('Generation sample at step 1')).toBeVisible();
+  await page.evaluate(() => { (window as any).testComfy.extensionManager.workflow.activeWorkflow = { path: 'Other.json', filename: 'Other.json' }; });
+  await expect(companion.getByRole('heading', { name: 'Preview paused', exact: true })).toBeVisible();
+  await request.post('/comfy/test/relay/sample', { data: { channel: 'film A', step: 2 } });
+  await expect(companion.getByAltText('Generation sample at step 2')).not.toBeVisible();
+  await companion.getByRole('button', { name: 'Attach current tab' }).click();
+  await expect(companion.getByAltText('Generation sample at step 2')).toBeVisible();
+});

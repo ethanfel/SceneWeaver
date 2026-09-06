@@ -9,6 +9,7 @@ const schemas = JSON.parse(readFileSync('public/examples/h3-schemas.json'));
 const starter = JSON.parse(readFileSync('public/examples/h3-starter.api.json'));
 const upstream = http.createServer(app), ws = new WebSocketServer({ server: upstream });
 let pending = [], reviews = [], decisions = [], submissions = [], playback = false, adjacent = false;
+let relayInstalled = false; const relayFeeds = new Map();
 const media = filename => ({ filename, subfolder: 'test', type: 'output' });
 const baseTake = { scene: 1, scene_id: 'the_arrival', revision: 'base', active: true, ready: true, raw_frames: 124, delivered_frames: 108, seed: '18446744073709551615', steps: 12, prompt: 'Saved direction', lineage_status: 'current', dependencies: [], video: media('base.webm'), audio: media('base.wav') };
 const alternate = { ...baseTake, revision: 'final-alt', active: false, take_kind: 'editorial_alternate', alternate_of_revision: 'base', used_in_final_cut: true, video: media('final-alt.webm') };
@@ -21,7 +22,7 @@ const catalog = () => ({ project: 'sceneweaver_first_film', revision: String(ass
 const broadcast = (type, data) => ws.clients.forEach(client => client.send(JSON.stringify({ type, data })));
 ws.on('connection', client => client.send(JSON.stringify({ type: 'status', data: { status: { exec_info: { queue_remaining: 0 } } } })));
 app.get('/system_stats', (_req, res) => res.json({ devices: [{ name: 'Test GPU' }] }));
-app.get('/object_info', (_req, res) => res.json(schemas));
+app.get('/object_info', (_req, res) => res.json(relayInstalled ? { ...schemas, PreviewRelay: { input: { required: { channel: ['STRING', { default: 'main' }] } } } } : schemas));
 app.get('/queue', (_req, res) => res.json({ queue_running: [], queue_pending: pending }));
 app.get('/userdata', (_req, res) => res.json(['H3/Test workflow.json']));
 app.get('/userdata/{*path}', (_req, res) => res.json(starter));
@@ -52,7 +53,26 @@ app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock
 app.get('/minimax_h3_context_loop/project-assets', (_req, res) => res.json(catalog()));
 app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
 app.get('/minimax_h3_context_loop/project-assets/media', (_req, res) => res.type('image/svg+xml').send('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#334139"/><circle cx="120" cy="65" r="25" fill="#829589"/></svg>'));
-app.post('/test/reset', (_req, res) => { pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; res.json({}); });
+app.post('/test/reset', (_req, res) => { pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; relayInstalled = false; relayFeeds.clear(); res.json({}); });
+app.post('/test/relay/install', (_req, res) => { relayInstalled = true; res.json({}); });
+const relayFeed = channel => { if (!relayFeeds.has(channel)) relayFeeds.set(channel, { boundaries: [], steps: [], media: { seq: 0 } }); return relayFeeds.get(channel); };
+app.get('/preview_relay/state', (req, res) => { if (!relayInstalled) return res.sendStatus(404); const feed = relayFeed(req.query.channel); res.json({ boundaries: feed.boundaries, steps: feed.steps }); });
+app.get('/preview_relay/media', (req, res) => { if (!relayInstalled) return res.sendStatus(404); res.json(relayFeed(req.query.channel).media); });
+app.post('/test/relay/sample', (req, res) => {
+  const { channel = 'main', step = 1, seq = step, reset = false, audio = false, video = false, notify = true } = req.body;
+  const feed = relayFeed(channel);
+  if (reset) {
+    const boundary = { channel, reset: true, step: 0, total: 12, sigmas: [1, .5, 0] };
+    feed.boundaries = [boundary]; feed.steps = [];
+    if (notify) broadcast('preview_relay', boundary);
+  } else {
+    const event = { channel, step, total: 12, w: 160, h: 90, avg_step_ms: 1500, preview_ms: 123 };
+    feed.steps.push(event);
+    feed.media = { seq, step, mime: video ? 'video/mp4' : 'image/webp', image: readFileSync(video ? 'e2e/fixtures/sampling.mp4' : 'e2e/fixtures/sampling.webp').toString('base64'), ...(audio ? { audio: readFileSync('e2e/fixtures/audio.wav').toString('base64'), audio_mime: 'audio/wav' } : {}) };
+    if (notify) broadcast('preview_relay', { ...event, media_seq: seq });
+  }
+  res.json({});
+});
 app.post('/test/disconnect', (_req, res) => { ws.clients.forEach(client => client.close()); res.json({}); });
 upstream.listen(0, '127.0.0.1', () => {
   const { server } = createApp({ target: `http://127.0.0.1:${upstream.address().port}` }); server.listen(4319, '127.0.0.1');

@@ -12,3 +12,7 @@
 `public/examples/h3-schemas.json` contains the relevant ComfyUI/H3 node schema metadata, with machine-specific model choices reduced to the starter's selections. Connected operation always uses the live server's schemas. The offline snapshot was inspected against ComfyUI 0.34.0 on 2026-09-05.
 
 Runtime and development dependencies retain their individual package licenses; the exact dependency versions are recorded in `package-lock.json`. The UI uses Lucide icons (ISC). DM Sans and IBM Plex Mono are optional Google Fonts requested by the stylesheet, with local system-font fallbacks; no font files are redistributed.
+
+## PreviewRelay interoperability
+
+SceneWeaver includes an independently implemented client for the HTTP and WebSocket protocol exposed by [ComfyUI-PreviewRelay](https://github.com/drozbay/ComfyUI-PreviewRelay), inspected at revision `460878239193fd4dc943d9130db8dc1748228bbb`. PreviewRelay's Python nodes and browser viewer are not bundled or redistributed. Users install that experimental optional node pack separately on their ComfyUI server.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Checkpoint, Editorial, ComfyEvent, MediaFile, Queue, Review, Run, Schemas, Workflow } from '../types';
 import { comfy, H3, post, request } from '../lib/api';
 import { parseJSON } from '../lib/workflow';
+import type { RelaySubscribe } from '../lib/previewRelay';
 
 export type Job = { id: string; status: string; node?: string; progress?: number; error?: string };
 const emptyQueue: Queue = { queue_running: [], queue_pending: [] };
@@ -31,6 +32,10 @@ export function useComfy(runName: string, followProject = false) {
   const connectionGeneration = useRef(0);
   const following = useRef(followProject); following.current = followProject;
   const eventReceiver = useRef<(event: ComfyEvent) => void>(() => {});
+  const relayListeners = useRef(new Set<(value: unknown) => void>());
+  const subscribePreviewRelay: RelaySubscribe = useCallback(listener => {
+    relayListeners.current.add(listener); return () => { relayListeners.current.delete(listener); };
+  }, []);
   const log = useCallback((text: string) => setEvents(old => [`${new Date().toLocaleTimeString()}  ${text}`, ...old].slice(0, 100)), []);
   const refresh = useCallback(async () => {
     const generation = connectionGeneration.current;
@@ -127,6 +132,8 @@ export function useComfy(runName: string, followProject = false) {
       const handle = (message: ComfyEvent) => {
         if (disposed) return;
         const { type, data } = message, id = String(data?.prompt_id || '');
+        // PreviewRelay broadcasts by channel, without a prompt or node ID.
+        if (type === 'preview_relay') { relayListeners.current.forEach(listener => listener(data)); return; }
         if (type === 'execution_start') void refresh();
         if (type === 'status' || type.startsWith('minimax_h3_context_loop_')) {
           void refresh();
@@ -175,5 +182,5 @@ export function useComfy(runName: string, followProject = false) {
     await refresh();
   };
   const receiveEvent = useCallback((event: ComfyEvent) => eventReceiver.current(event), []);
-  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints, editorial, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent };
+  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints, editorial, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent, subscribePreviewRelay };
 }

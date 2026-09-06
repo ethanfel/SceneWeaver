@@ -41,6 +41,16 @@ Sequence playback follows the sorted editorial segments and retains gaps as time
 
 Manual scene navigation pauses playback. Take previews are isolated in Clip mode; returning to Sequence restores the saved final-cut choices. Changing the saved cut pauses an active sequence for review. Playback stops at the last planned scene, and replay starts at zero. This browser transport does not assemble media or promise frame-exact, gapless delivery between remote files.
 
+## Generation monitoring
+
+The optional PreviewRelay adapter uses `preview_relay` notifications on the existing ComfyUI WebSocket, plus GET `/preview_relay/state` and `/preview_relay/media` with an exact channel name. These broadcasts have no prompt or node identity, so they bypass job-ID filtering but never update job status or scene media. Channels are discovered from the attached baseline's literal relay/target inputs; linked channel values require explicit selection.
+
+Opening Generation restores sampling statistics and the latest media. A single transfer loop coalesces new sequence notifications instead of accumulating image downloads. Responses are fenced by channel, connection, and sampling reset; abort signals cancel stale work. A fresh reset clears the image and suppresses restoration of the previous media still cached upstream until the new run has a sample. Blob URLs are released on replacement and cleanup. Unsupported MIME types and invalid media data fail visibly. Reconnects reread state, and a changed native workflow tab pauses the monitor until the attachment is resolved.
+
+The adapter supports JPEG, PNG, animated WebP, and MP4/WebM samples with optional WAV audio. Audio is opt-in and follows the sample video clock when available. Animated image playback has no readable browser clock, so its audio loops independently. The native PreviewRelay page remains available for decoding controls; SceneWeaver does not write to its channel-global control endpoint.
+
+Protocol inspected at PreviewRelay revision `460878239193fd4dc943d9130db8dc1748228bbb`. Browser tests use synthetic media and mocked endpoints. An actual H3 generation with the installed relay remains a production compatibility check, not a result of those tests.
+
 ## Main modules
 
 - `public/integrations/bridge-core.mjs`: widget validation, draft diffing, and reconciliation shared by the browser adapter and UI.
@@ -49,6 +59,7 @@ Manual scene navigation pauses playback. Take previews are isolated in Clip mode
 - `src/hooks/useLiveWorkflow.ts`: verified parent messages, request acknowledgments/timeouts, and connection state.
 - `src/hooks/useComfy.ts`: remote discovery, job reconciliation, reviews, checkpoints, history, and scoped queue controls.
 - `src/lib/playback.ts`: media selection, subtitle parsing, and editorial timing. `PreviewPlayer.tsx` synchronizes picture, generated audio, source soundtrack, and captions.
+- `src/lib/previewRelay.ts`, `src/hooks/usePreviewRelay.ts`, `src/components/GenerationPanel.tsx`: optional channel-based sampling previews and audio, with bounded media replacement and connection cleanup.
 - `src/components/ProjectPanel.tsx`: project asset edits and take inspection, with stale-response cancellation.
 - `src/components/Inspector.tsx`, `Timeline.tsx`, `ReviewPanel.tsx`: scene settings, generation sequence, and H3 review actions.
 - `src/lib/workflow.ts`: detached imports/exports, supported canvas conversion, validation, and exact integer reading.

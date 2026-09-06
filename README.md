@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.2** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.3** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -57,6 +57,7 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 | See the sequence | Select scenes in the bin or timeline. Saved H3 trims, placements, gaps, and chosen alternate pictures are reflected. Unfinished scenes use labeled raw estimates. |
 | Play the whole cut | **Sequence** is the default: Play or Space advances through saved clips and timeline gaps. Scrub the full cut or jump between scenes. Unrendered scenes show a timed placeholder; playback stops at the sequence end. |
 | Hear audio and see captions | The viewer pairs raw/alternate pictures with generated WAV sidecars, synchronizes the saved Plan Studio soundtrack, and overlays its selected SRT/LRC lyrics. Use the generated-audio/source-soundtrack switches, volume, and CC controls. |
+| Watch sampling | **Generation** connects to an optional PreviewRelay channel, displays still/animated samples or MP4 previews, and plays decoded audio on request. Step counts, average sampling time, and preview decoding cost are shown. |
 | Compare scene takes | The **Scene take** selector previews the final cut, its generated base, or compatible picture alternates. **All takes** opens the revision list for that scene. **Clip** mode stops at the selected scene’s end; selecting a base or alternate take enters this mode. Return to **Sequence** to watch the saved final-cut choices. These preview choices do not activate a different H3 checkpoint. |
 | Edit prompts | Change the scene direction, shared direction, seeds, frame counts, or scalar node settings. **Apply to ComfyUI** writes the draft into the attached graph through native widget callbacks. |
 | Handle simultaneous edits | Disjoint widget edits merge. Changes to the same widget raise a conflict and preserve the local draft. Export the draft before **Reload from ComfyUI** to keep both versions. A plan JSON widget is one conflict unit. |
@@ -70,6 +71,19 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 Changing the active ComfyUI workflow pauses writes. Return to the attached tab or explicitly choose **Attach current tab**. Attachment never takes ownership away from another workflow. The native H3 ownership error is shown if the current workflow cannot write the project.
 
 Applied changes live in the ComfyUI graph; save that workflow through ComfyUI as usual. Unapplied companion drafts stay in memory and trigger a browser leave warning. Export important drafts before closing or reloading. Credentials and ownership widgets are excluded from live inspection, and live graphs are not copied into localStorage. A native workflow export has the same contents as ComfyUI's own serialization, so review it before sharing.
+
+## Live generation previews with PreviewRelay
+
+Install [ComfyUI-PreviewRelay](https://github.com/drozbay/ComfyUI-PreviewRelay) in ComfyUI's persistent `custom_nodes` directory inside Docker. Restart ComfyUI after any running render finishes. Then:
+
+1. Insert **Preview Relay** on the MODEL connection that reaches your sampler. Give it a channel unique to your workflow, for example `sceneweaver_my_film`.
+2. Configure preview resolution, frame count, and VAE decoding steps in ComfyUI. A compatible optional **audio_vae** supplies sample audio. Decoding previews adds work to sampling; the relay can use fast previews or selected VAE steps.
+3. Refresh SceneWeaver, open **Generation**, and choose the channel. Literal channel names from the attached workflow are suggested automatically. Use **Check installation** if SceneWeaver was connected before the node was installed.
+4. Start generation normally. **Sample audio** enables monitoring; **Open PreviewRelay** opens its native viewer and decoding controls.
+
+The current sample is restored when attaching mid-render or reconnecting. Only the latest sample is retained locally. A new run clears the previous picture, and changing channels, servers, or the attached workflow cancels pending preview reads. Leaving the Generation tab stops its media playback. Animated images and audio loop independently; MP4 samples provide a clock for audio alignment.
+
+PreviewRelay events are shared by channel across the ComfyUI server and do not identify a prompt, workflow, or scene. SceneWeaver displays the channel name and never attaches sampling images to a scene or marks them as saved takes. The integration reads PreviewRelay's existing HTTP endpoints and WebSocket notifications through the local proxy. It does not install nodes, rewire the graph, change decoding settings, or start a render automatically. PreviewRelay remains an experimental, optional dependency; no additional ports or Docker mounts are needed.
 
 ## Current boundaries
 
@@ -105,7 +119,7 @@ To use an installed browser:
 SCENEWEAVER_CHROMIUM=/path/to/chrome npm run test:e2e
 ```
 
-Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures, continuous cuts and gaps, unrendered scenes, pause/seek/restart, and clip isolation. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
+Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures, continuous cuts and gaps, unrendered scenes, pause/seek/restart, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
 
 ## Sources
 
