@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.5** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.3.0** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -21,6 +21,8 @@ npm start
 ```
 
 Open **http://127.0.0.1:4310**. The connection dialog can change the remote address until restart. `.env.local` can hold machine-specific settings and is ignored by Git.
+
+After updating SceneWeaver, rebuild and restart its service. Refresh the **ComfyUI browser tab**, then reopen SceneWeaver to load new native adapters. A ComfyUI server restart is unnecessary for a SceneWeaver update. Export any unapplied drafts from older versions before refreshing.
 
 For development, use `npm run dev` and **http://127.0.0.1:5173**. The Vite proxy expects the Node backend on port 4310.
 
@@ -65,12 +67,15 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 | Follow a running project | Existing queued/running jobs with the selected H3 run name are discovered. The parent tab forwards execution events, and the companion reconciles queue, review, and checkpoint state through HTTP. |
 | Review generations | Approve, retry, reroll, approve-and-stop, or select saved candidate takes at H3's review boundary. Native H3 review behavior remains authoritative. |
 | Manage assets | **Assets** previews the project catalog, uploads one file at a time, imports relative ComfyUI input paths, and edits tags, roles, and enabled state. Writes use the carousel's native ownership helper and update its catalog. Apply prompt drafts before asset writes. |
-| Inspect checkpoints | **Takes** lists revisions, active status, delivered duration, seed, prompt, and dependencies. Preview/download footage or export checkpoint metadata. **Manage branches in ComfyUI** focuses the native checkpoint manager. |
+| Compare saved takes | **Takes → Compare takes** shows two pictures with their prompts, seeds, and durations. Playing either side pauses the other. Alternates use their base checkpoint’s generated audio. |
+| Choose the final-cut picture | **Use in final cut** selects the active base picture or a compatible alternate. H3 saves the choice with an editorial revision check; the timeline and native Plan Studio refresh. Other trims, placements, soundtrack and subtitle settings are preserved. |
+| Restore checkpoints | **Restore checkpoint…** previews the chapter, checkpoints to activate, later active pointers to clear, and dependencies outside that chapter. **Restore this branch** uses H3’s native activation and Plan restoration helpers. The ComfyUI queue must be empty. Immutable takes remain available; the operation does not queue generation. |
+| Recover prompt drafts | Editable widget changes are backed up in this browser, scoped to the server, workflow identity, Plan and original project. Refresh or reopen the matching workflow to review, restore, export or discard its saved draft. Restoring stages edits; **Apply to ComfyUI** remains explicit. |
 | Export | **Export workflow** downloads the native canvas document. **Export draft** downloads unapplied widget edits. Download media in Assets, Takes, or Renders. Final assembly follows the workflow's H3 assembly nodes. |
 
 Changing the active ComfyUI workflow pauses writes. Return to the attached tab or explicitly choose **Attach current tab**. Attachment never takes ownership away from another workflow. The native H3 ownership error is shown if the current workflow cannot write the project.
 
-Applied changes live in the ComfyUI graph; save that workflow through ComfyUI as usual. Unapplied companion drafts stay in memory and trigger a browser leave warning. Export important drafts before closing or reloading. Credentials and ownership widgets are excluded from live inspection, and live graphs are not copied into localStorage. A native workflow export has the same contents as ComfyUI's own serialization, so review it before sharing.
+Applied changes live in the ComfyUI graph; save that workflow through ComfyUI as usual. Unapplied companion drafts are backed up in localStorage as widget changes only; full live graphs and attachment tokens are not stored. Recovery checks widget types/editability and shows newer ComfyUI values before staging a saved draft. Backups are removed after apply or discard. If storage fails or another companion window changes the same backup, export the draft before closing. Credentials and ownership widgets are excluded from live inspection and draft backups. A native workflow export has the same contents as ComfyUI's own serialization, so review it before sharing.
 
 ## Live generation previews with PreviewRelay
 
@@ -89,7 +94,9 @@ PreviewRelay events are shared by channel across the ComfyUI server and do not i
 
 - The timeline edits the generation sequence. Trimming rendered media, transitions, audio mixing, arbitrary track placement, and independent movie export are future work. Sequence timing applies saved H3 trims and placements, combines delivered clips with raw estimates, and does not resolve every H3 continuity policy for unfinished scenes in advance. Sequence playback preserves gaps and unfinished scenes. It ends at the last planned scene, even if the source soundtrack is longer. Remote clip loading can briefly buffer at cuts; this is a browser preview, not a frame-exact assembled export.
 - Subtitle text, offset, and soundtrack selection come from the saved H3 project. Change those settings in Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
-- Native reference-slot binding, folder organization, asset deletion, checkpoint activation/deletion, and branch recovery remain in ComfyUI. The companion provides navigation to the relevant native nodes.
+- Native reference-slot binding, folder organization, asset deletion, checkpoint deletion, lineage attribution, and workflow-local branch pinning remain in ComfyUI. The companion provides navigation to the relevant native nodes.
+- Take writes require the selected Plan and its matching Asset Carousel. Unsupported native adapters leave their actions disabled. Checkpoint activation changes the project-wide branch within its chapter and restores scene settings into the attached Plan; it does not configure Loop Start resume settings or restore model/policy wiring. Save the restored workflow in ComfyUI and inspect its generation controls before queuing.
+- Draft backups are browser-local, not server backups. Clearing browser data removes them. A renamed workflow, changed graph identity, or different SceneWeaver browser origin can require returning to the original attachment to export the old draft.
 - A live snapshot exposes named scalar widgets and links for inspection, including nested graph nodes. It is not an API execution graph. Connected inputs and native catalog/proof fields cannot be overwritten through generic input editing. Custom node controls with no scalar widget remain native.
 - Asset edits compare the displayed fields with the server before writing. H3's ownership guard remains the server authority; its current update API does not offer an atomic revision precondition for two simultaneous edits from the same owner.
 - Snapshot polling runs every two seconds while the parent is available. Browser background throttling can mark the link disconnected; focusing either window resumes the handshake. Reconnect does not automatically retry writes whose outcome is unknown.
@@ -119,7 +126,7 @@ To use an installed browser:
 SCENEWEAVER_CHROMIUM=/path/to/chrome npm run test:e2e
 ```
 
-Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, ruler scrubbing across zoom and scroll offsets, frame keys, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
+Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, A/B take audio, revision-checked final-cut writes, checkpoint impact/activation and delayed-response guards, draft recovery and workflow isolation, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, ruler scrubbing across zoom and scroll offsets, frame keys, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
 
 ## Sources
 

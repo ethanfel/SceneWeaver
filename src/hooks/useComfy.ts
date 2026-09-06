@@ -30,6 +30,7 @@ export function useComfy(runName: string, followProject = false) {
   const tracked = useRef(new Set<string>());
   const runRef = useRef(runName); runRef.current = runName;
   const connectionGeneration = useRef(0);
+  const checkpointRequest = useRef(0);
   const following = useRef(followProject); following.current = followProject;
   const eventReceiver = useRef<(event: ComfyEvent) => void>(() => {});
   const relayListeners = useRef(new Set<(value: unknown) => void>());
@@ -62,12 +63,12 @@ export function useComfy(runName: string, followProject = false) {
     if (result[2].status === 'fulfilled') setRuns(result[2].value.runs || []);
   }, []);
   const refreshCheckpoints = useCallback(async () => {
-    const name = runRef.current, generation = connectionGeneration.current;
+    const name = runRef.current, generation = connectionGeneration.current, requestId = ++checkpointRequest.current;
     if (!name) { setCheckpoints([]); setEditorial(null); return; }
     try {
       const result = await comfy<{ checkpoints: Checkpoint[]; editorial?: Editorial }>(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`);
-      if (runRef.current === name && generation === connectionGeneration.current) { setCheckpoints(result.checkpoints || []); setEditorial(result.editorial || null); }
-    } catch (e) { if (generation === connectionGeneration.current) setError(String(e)); }
+      if (requestId === checkpointRequest.current && runRef.current === name && generation === connectionGeneration.current) { setCheckpoints(result.checkpoints || []); setEditorial(result.editorial || null); }
+    } catch (e) { if (requestId === checkpointRequest.current && runRef.current === name && generation === connectionGeneration.current) setError(String(e)); }
   }, []);
   const loadHistory = useCallback(async (id: string) => {
     const generation = connectionGeneration.current;

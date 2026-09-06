@@ -1,4 +1,5 @@
 import { PROTOCOL, validateEdits } from './bridge-core.mjs';
+import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -6,16 +7,17 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false } = {}) {
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
+  const previews = new Map();
   function root() { return app.graph?.rootGraph || app.graph; }
   function describe() {
     const graph = root(), active = app.extensionManager?.workflow?.activeWorkflow;
     if (!graph) throw new Error('ComfyUI has no open graph.');
     if (!bindings.has(graph)) bindings.set(graph, token());
     const identity = String(active?.activeState?.id || active?.path || graph.id || bindings.get(graph));
-    return { binding: `${identity}:${bindings.get(graph)}`, workflowId: String(graph.id || ''), name: String(active?.filename || active?.path || 'Unsaved ComfyUI workflow') };
+    return { binding: `${identity}:${bindings.get(graph)}`, workflowId: String(graph.id || ''), workflowKey: String(active?.path || graph.id || identity), name: String(active?.filename || active?.path || 'Unsaved ComfyUI workflow') };
   }
   function snapshot() {
     const descriptor = describe(), nodes = {}; refs.clear();
@@ -39,7 +41,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog } = {
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, capabilities: { finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     return { ...document, revision };
   }
@@ -54,10 +56,39 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog } = {
     if (!node || (node.comfyClass || node.type) !== 'MiniMaxH3ProjectAssetManager' || widget(node, 'run_name')?.value !== command.project) throw new Error('The asset carousel no longer belongs to the attached project.');
     return node;
   }
+  function projectPlan(command) {
+    const manager = projectNode(command), plan = refs.get(command.plan);
+    if (!plan || !['MiniMaxH3ChainPlan', 'MiniMaxH3ChainPlanModern', 'MiniMaxH3ChainPlanStudio'].includes(plan.comfyClass || plan.type) || !widget(plan, 'plan_json')) throw new Error('Select the attached H3 Plan before managing takes.');
+    if ((plan.comfyClass || plan.type) === 'MiniMaxH3ChainPlanStudio' && plan.inputs?.some(input => input.name === 'plan' && input.link != null)) throw new Error('Select the upstream Plan instead of its connected Plan Studio before managing takes.');
+    const input = plan.inputs?.find(item => item.name === 'project_assets' && item.link != null);
+    if (input) {
+      const link = plan.graph.links?.get?.(input.link) || plan.graph.links?.[input.link];
+      if (manager.graph !== plan.graph || String(link?.origin_id) !== String(manager.id)) throw new Error('The Plan is connected to a different asset carousel.');
+    } else if (widget(plan, 'run_name')?.value !== command.project) throw new Error('The Plan no longer belongs to this project.');
+    if (!snapshot().nodes[command.plan]?.editable.includes('plan_json')) throw new Error('The attached Plan JSON is controlled by a connection or is read-only.');
+    return { manager, plan };
+  }
+  async function readTakes(command) {
+    projectPlan(command);
+    const response = await api.fetchApi(`${H3}/checkpoints?${new URLSearchParams({ run_name: command.project, include_graph: 'true' })}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Cannot read the saved takes.');
+    if (data.run_name !== command.project || !Array.isArray(data.checkpoints) || !Array.isArray(data.revisions)) throw new Error('H3 returned unexpected checkpoint data. Refresh the project.');
+    projectPlan(command);
+    return data;
+  }
+  async function requireIdle() {
+    const response = await api.fetchApi('/queue'), queue = await response.json();
+    if (!response.ok || !Array.isArray(queue.queue_running) || !Array.isArray(queue.queue_pending)) throw new Error('Cannot verify the ComfyUI queue.');
+    if (queue.queue_running.length || queue.queue_pending.length) throw new Error('Wait for the ComfyUI queue to finish before restoring a checkpoint branch.');
+  }
+  function refreshEditors() {
+    for (const node of refs.values()) { try { node._h3PlanStudioRefresh?.(); node._h3CheckpointManagerRefresh?.(); } catch { /* Native polling also reconciles saved state. */ } }
+  }
   async function projectRequest(command, path, body, options = {}) {
     const node = projectNode(command);
     let requestOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...options };
-    if (widget(node, 'ownership_json')) {
+    if (ownershipOptions || widget(node, 'ownership_json')) {
       if (!ownershipOptions) throw new Error('This H3 version requires its native ownership adapter. Use the Project Asset Carousel in ComfyUI.');
       requestOptions = await ownershipOptions(node, command.project, requestOptions);
     }
@@ -120,6 +151,51 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog } = {
         if (queued === false) throw new Error('ComfyUI rejected the queue request. Check its validation message.');
         return { queued: true, snapshot: snapshot() };
       }
+      if (command.action === 'take-final-cut') {
+        if (!finalCut || !ownershipOptions) throw new Error('Reopen the companion from ComfyUI with an H3 version that supports revision-checked final-cut saves.');
+        const payload = await readTakes(command), body = finalCutDocument(payload, command);
+        const result = await projectRequest(command, `${H3}/editorial`, body);
+        if (!result.warning) refreshEditors();
+        return result;
+      }
+      if (command.action === 'checkpoint-preview') {
+        if (!nativeCheckpoints || !ownershipOptions) throw new Error('This installed H3 checkpoint adapter is unavailable. Reopen the companion from ComfyUI or use its native checkpoint manager.');
+        const payload = await readTakes(command);
+        const impact = checkpointImpact(payload, command, nativeCheckpoints);
+        await requireIdle();
+        const { plan } = projectPlan(command);
+        // Validate the native restoration against this exact Plan before the
+        // user sees the confirmation. The backend returns authoritative values.
+        nativeCheckpoints.restorePlan(widget(plan, 'plan_json').value, impact.restored.map(item => ({ ...item, scene_prompt: item.scene_prompt ?? item.prompt })));
+        const stamp = await checkpointStamp(payload); projectPlan(command);
+        const ticket = token(); previews.clear();
+        previews.set(ticket, { command, impact, stamp });
+        return { data: { ...impact, ticket }, snapshot: snapshot() };
+      }
+      if (command.action === 'checkpoint-activate') {
+        const preview = previews.get(command.ticket); previews.delete(command.ticket);
+        if (!preview || ['binding', 'revision', 'node', 'plan', 'project'].some(key => preview.command[key] !== command[key])) throw new Error('Preview the checkpoint impact again before restoring it.');
+        const payload = await readTakes(command);
+        if (await checkpointStamp(payload) !== preview.stamp) throw new Error('The checkpoint graph or saved cut changed. Preview the impact again.');
+        await requireIdle();
+        const { plan } = projectPlan(command), originalPlan = widget(plan, 'plan_json').value;
+        const { scope, lineage } = preview.impact;
+        const result = await projectRequest(command, `${H3}/checkpoint-revisions/restore`, { run_name: command.project, activate_only: true, resume_scene: preview.command.scene + 1, scope_start_scene: scope.start, scope_end_scene: scope.end, revisions: lineage });
+        if (result.warning) return result;
+        if (snapshot().revision !== command.revision || widget(plan, 'plan_json').value !== originalPlan) return { ...result, warning: 'The checkpoint branch was restored, but the workflow changed while H3 was writing. Its Plan was left untouched. Review the branch in ComfyUI before continuing.' };
+        try {
+          if (result.data.run_name !== command.project || !Array.isArray(result.data.restored)) throw new Error('H3 returned an unexpected restoration result.');
+          const value = nativeCheckpoints.restorePlan(originalPlan, result.data.restored);
+          root().beforeChange?.();
+          try {
+            const target = widget(plan, 'plan_json'); target.value = value; target.callback?.(value);
+            nativeCheckpoints.refreshPlan?.(plan, result.data.restored);
+            root().change?.(); root().setDirtyCanvas?.(true, true);
+          } finally { root().afterChange?.(); }
+          refreshEditors();
+          return { data: result.data, snapshot: snapshot() };
+        } catch (error) { return { data: result.data, snapshot: snapshot(), warning: `H3 restored the branch, but the Plan could not be synchronized: ${error.message}. Review it in ComfyUI before queuing.` }; }
+      }
       if (command.action === 'asset-update') {
         const allowed = ['tag', 'role', 'enabled', 'lyrics'];
         if (!command.changes || Object.keys(command.changes).some(key => !allowed.includes(key))) throw new Error('Unsupported asset change.');
@@ -153,11 +229,38 @@ async function h3Adapters(api) {
     const syncPath = source.match(/["'](\.\/h3_project_asset_sync_core\.mjs[^"']*)["']/)?.[1];
     const ownership = ownershipPath ? await import(new URL(ownershipPath, base).href) : {};
     const sync = syncPath ? await import(new URL(syncPath, base).href) : {};
-    return { ownershipOptions: ownership.projectMutationOptions, publishCatalog: sync.publishProjectAssetCatalogChanged ? (node, project, catalog) => {
+    const adapters = { ownershipOptions: ownership.projectMutationOptions, publishCatalog: sync.publishProjectAssetCatalogChanged ? (node, project, catalog) => {
       const value = widget(node, 'catalog_json');
       if (value) { value.value = JSON.stringify(sync.serializedProjectAssetCatalog?.(catalog, project) || catalog); value.callback?.(value.value); }
       sync.publishProjectAssetCatalogChanged(node, catalog);
     } : undefined };
+    const studioPath = paths.find(path => path.endsWith('/h3_chain_plan_studio.js'));
+    if (studioPath) {
+      const studio = await (await fetch(studioPath)).text();
+      adapters.finalCut = studio.includes('base_revision:') && studio.includes('/minimax_h3_context_loop/editorial');
+    }
+    try {
+      const managerPath = paths.find(path => path.endsWith('/h3_chain_checkpoint_manager.js'));
+      if (managerPath) {
+        const managerSource = await (await fetch(managerPath)).text(), managerBase = new URL(managerPath, location.href);
+        const nativeImport = async name => {
+          const reference = managerSource.match(new RegExp(`["'](\\./${name.replaceAll('.', '\\.')}[^"']*)["']`))?.[1];
+          if (!reference) throw new Error(`H3 does not expose ${name}`);
+          return import(new URL(reference, managerBase).href);
+        };
+        const [core, plan, review, restore, prompts] = await Promise.all(['h3_checkpoint_manager_core.mjs', 'h3_chain_plan_core.mjs', 'h3_chain_review_core.mjs', 'h3_plan_restore_core.mjs', 'h3_prompt_companion_sync.mjs'].map(nativeImport));
+        if ([core.checkpointActivationMode, core.checkpointRevisionLineage, plan.parsePlanJson, plan.planToJson, review.applyCheckpointRevisionSet, restore.refreshRestoredPlanEditors].every(value => typeof value === 'function')) adapters.checkpoints = {
+          checkpointActivationMode: core.checkpointActivationMode, checkpointRevisionLineage: core.checkpointRevisionLineage,
+          restorePlan: (value, revisions) => plan.planToJson(review.applyCheckpointRevisionSet(plan.parsePlanJson(String(value)), revisions, { useEffectivePrompts: true, useTipSharedPrompt: true })),
+          refreshPlan: (node, revisions) => {
+            restore.refreshRestoredPlanEditors(node);
+            const document = plan.parsePlanJson(String(widget(node, 'plan_json').value));
+            for (const item of revisions) prompts.publishCompanionPrompt?.(node, node, item.scene - 1, plan.promptValueToText(document.shots[item.scene - 1]?.prompt));
+          },
+        };
+      }
+    } catch { /* Existing asset and final-cut actions remain available. */ }
+    return adapters;
   } catch { return {}; }
 }
 
