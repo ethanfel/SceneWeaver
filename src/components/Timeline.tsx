@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, ChevronRight, Film, Maximize2, Minus, MousePointer2, Plus, Volume2 } from 'lucide-react';
 import type { Checkpoint, Editorial, Plan, Value } from '../types';
 import { checkpointFor, timecode } from '../lib/h3';
@@ -8,6 +8,7 @@ import { checkpointThumbnailUrl, playbackSegments } from '../lib/playback';
 const colors = ['#53748c', '#697a62', '#8d705d', '#796789', '#5c8583', '#8e6d7c'];
 export function Timeline({ project, server, plan, inputs, checkpoints, editorial, selected, select, add, currentTime, onSeek }: { project: string; server: string; plan: Plan | null; inputs: Record<string, Value>; checkpoints: Checkpoint[]; editorial?: Editorial | null; selected: number; select: (i: number) => void; add: () => void; currentTime: number; onSeek: (seconds: number) => void }) {
   const [zoom, setZoom] = useState(1);
+  const dragging = useRef<number | null>(null);
   const segments = playbackSegments(plan, inputs, checkpoints, editorial);
   let previousEnd = 0, width = 0;
   const layout = segments.map(segment => {
@@ -20,14 +21,38 @@ export function Timeline({ project, server, plan, inputs, checkpoints, editorial
   const following = layout.find(item => item.start > currentTime);
   const playhead = active ? active.left + (currentTime - active.start) / active.duration * active.width
     : following ? following.left - (following.start - currentTime) * 23 * zoom : width;
+  const seekAt = (x: number) => {
+    let seconds = previousEnd;
+    for (const item of layout) {
+      if (x < item.left) { seconds = item.start - (item.left - x) / (23 * zoom); break; }
+      if (x < item.left + item.width) { seconds = item.start + (x - item.left) / item.width * item.duration; break; }
+    }
+    onSeek(Math.max(0, Math.min(previousEnd, Math.round(seconds * 24) / 24)));
+  };
   return <section className="timeline panel">
     <div className="timeline-toolbar"><div className="timeline-name"><Film size={15}/><strong>Scene sequence</strong><ChevronRight size={13}/><span>{plan?.shots.length || 0} scenes</span></div><div className="timeline-tools"><MousePointer2 size={14}/><span className="divider"/><button className="icon-button" aria-label="Zoom out timeline" onClick={() => setZoom(v => Math.max(.4, v - .2))}><Minus size={15}/></button><input aria-label="Timeline zoom" type="range" min=".4" max="3" step=".1" value={zoom} onChange={e => setZoom(Number(e.target.value))}/><button className="icon-button" aria-label="Zoom in timeline" onClick={() => setZoom(v => Math.min(3, v + .2))}><Plus size={15}/></button><button className="icon-button" aria-label="Reset timeline zoom" onClick={() => setZoom(1)}><Maximize2 size={14}/></button></div></div>
     <div className="timeline-grid"><div className="track-labels"><div className="clock-label">24 FPS</div><div><span className="track-badge">V1</span><span>H3 scenes<small>Saved presentation</small></span><Film size={14}/></div><div><span className="track-badge audio">A1</span><span>Generated audio<small>Linked to picture</small></span><Volume2 size={14}/></div></div>
     <div className="timeline-scroll"><div className="timeline-content" style={{ minWidth: Math.max(width + 100, 600) }}>
-      <div className="ruler">{layout.map(item => <div key={item.index} style={{ width: item.width, marginLeft: item.gap }}>{timecode(item.start)}<i/><i/><i/></div>)}</div>
+      <div className="ruler" role="slider" aria-label="Timeline playhead" aria-valuemin={0} aria-valuemax={previousEnd} aria-valuenow={Math.max(0, Math.min(previousEnd, currentTime))} aria-valuetext={timecode(currentTime)} aria-disabled={!layout.length} tabIndex={layout.length ? 0 : -1}
+        onPointerDown={event => {
+          if (event.button !== 0 || !layout.length) return;
+          event.preventDefault(); event.currentTarget.focus({ preventScroll: true });
+          dragging.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId);
+          seekAt(event.clientX - event.currentTarget.getBoundingClientRect().left);
+        }}
+        onPointerMove={event => { if (dragging.current === event.pointerId) seekAt(event.clientX - event.currentTarget.getBoundingClientRect().left); }}
+        onPointerUp={() => { dragging.current = null; }} onPointerCancel={() => { dragging.current = null; }} onLostPointerCapture={() => { dragging.current = null; }}
+        onKeyDown={event => {
+          if (!layout.length) return;
+          const step = event.shiftKey ? 1 : 1 / 24;
+          const target = event.key === 'Home' ? 0 : event.key === 'End' ? previousEnd : event.key === 'ArrowLeft' ? currentTime - step : event.key === 'ArrowRight' ? currentTime + step : undefined;
+          if (target !== undefined) { event.preventDefault(); onSeek(Math.max(0, Math.min(previousEnd, target))); }
+        }}>
+        {layout.map(item => <div key={item.index} style={{ width: item.width, marginLeft: item.gap }}>{timecode(item.start)}<i/><i/><i/></div>)}
+      </div>
       <div className="video-track">{layout.map(item => {
         const shot = plan!.shots[item.index], checkpoint = checkpointFor(checkpoints, shot, item.index);
-        return <button key={item.index} className={`timeline-clip ${selected === item.index ? 'selected' : ''}`} style={{ width: item.width, marginLeft: item.gap, '--clip-color': colors[item.index % colors.length] } as React.CSSProperties} onClick={() => select(item.index)} onDoubleClick={event => { const rect = event.currentTarget.getBoundingClientRect(); if (selected === item.index) onSeek((event.clientX - rect.left) / rect.width * item.duration); else select(item.index); }} aria-label={`Select scene ${item.index + 1}: ${shot.id || 'Untitled'}`}>
+        return <button key={item.index} className={`timeline-clip ${selected === item.index ? 'selected' : ''}`} style={{ width: item.width, marginLeft: item.gap, '--clip-color': colors[item.index % colors.length] } as React.CSSProperties} onClick={() => select(item.index)} onDoubleClick={event => { const rect = event.currentTarget.getBoundingClientRect(); onSeek(item.start + Math.round((event.clientX - rect.left) / rect.width * item.duration * 24) / 24); }} aria-label={`Select scene ${item.index + 1}: ${shot.id || 'Untitled'}`}>
           <div><span>{String(item.index + 1).padStart(2, '0')}</span><strong>{shot.id?.replaceAll('_', ' ') || 'Untitled scene'}</strong>{checkpoint?.ready && <Check size={12}/>}</div><div className="clip-body"><CheckpointThumbnail url={checkpointThumbnailUrl(project, checkpoint, server)} name={shot.id || `Scene ${item.index + 1}`} filmstrip/><Film size={21}/><span className="clip-state">{checkpoint?.presentation_revision ? 'Final-cut alternate' : checkpoint?.ready ? 'Rendered' : 'Planned scene'}</span></div><small>{timecode(item.duration)}<span>{item.estimated ? 'raw' : 'clip'}</span></small>
         </button>;
       })}<button className="add-timeline" onClick={add} disabled={!plan} aria-label="Add scene"><Plus size={19}/></button></div>

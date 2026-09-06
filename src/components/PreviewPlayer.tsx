@@ -4,7 +4,7 @@ import type { PlaybackSegment, PreviewMedia, SubtitleCue } from '../types';
 import { timecode } from '../lib/h3';
 import { sequenceDuration, sequenceSpan, subtitleAt, type SequenceEntry } from '../lib/playback';
 
-export type PlayerControls = { toggle: () => void; seekScene: (seconds: number) => void; seekSequence: (seconds: number) => void };
+export type PlayerControls = { toggle: () => void; seekSequence: (seconds: number) => void };
 type Props = {
   media: PreviewMedia; segment?: PlaybackSegment; entries: SequenceEntry[];
   controls: RefObject<PlayerControls | null>; selectionKey: number; isolated: boolean;
@@ -111,7 +111,16 @@ export function PreviewPlayer({ media, segment, entries, controls, selectionKey,
     publish(target); sync(true, target);
   };
   const actions = useRef({ tick, sync, stop }); actions.current = { tick, sync, stop };
-  useImperativeHandle(controls, () => ({ toggle, seekScene: seconds => seek(sequence ? (active?.start || 0) + seconds : seconds), seekSequence: seconds => { if (sequence) seek(seconds); } }));
+  const seekSequence = (seconds: number) => {
+    stop();
+    const target = Math.max(0, Math.min(total, seconds));
+    if (sequence) { seek(target); return; }
+    // A timeline gesture always addresses the saved cut, even when the viewer
+    // was inspecting an isolated take or an unrelated source asset.
+    setSequence(true); cursor.current = target; setPosition(target); onTime(target);
+    const entry = sequenceSpan(entries, target)?.entry; if (entry) onScene(entry.index);
+  };
+  useImperativeHandle(controls, () => ({ toggle, seekSequence }));
   useLayoutEffect(() => {
     stop(); setAudioError(''); setClip({ media, segment });
     if (video.current) { try { video.current.currentTime = 0; } catch { /* New media applies the position after loading. */ } }

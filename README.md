@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.4** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.2.5** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -55,7 +55,7 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 | Task | How it works |
 | --- | --- |
 | See the sequence | Select scenes in the bin or timeline. Saved H3 trims, placements, gaps, and chosen alternate pictures are reflected. Timeline clips and scene cards display cached thumbnails of the saved final-cut revision. Unfinished scenes use labeled raw estimates. |
-| Play the whole cut | **Sequence** is the default: Play or Space advances through saved clips and timeline gaps. Scrub the full cut or jump between scenes. Unrendered scenes show a timed placeholder; playback stops at the sequence end. |
+| Play the whole cut | **Sequence** is the default: Play or Space advances through saved clips and timeline gaps. Click or drag the timeline ruler to pause and seek the saved cut, including from other viewer tabs or isolated takes. With the ruler focused, Left/Right steps one frame, Shift+Left/Right steps one second, and Home/End jumps to the sequence boundaries. Unrendered scenes show a timed placeholder; playback stops at the sequence end. |
 | Hear audio and see captions | The viewer pairs raw/alternate pictures with generated WAV sidecars, synchronizes the saved Plan Studio soundtrack, and overlays its selected SRT/LRC lyrics. Use the generated-audio/source-soundtrack switches, volume, and CC controls. |
 | Watch sampling | **Generation** connects to an optional PreviewRelay channel, displays still/animated samples or MP4 previews, and plays decoded audio on request. Step counts, average sampling time, and preview decoding cost are shown. |
 | Compare scene takes | The **Scene take** selector previews the final cut, its generated base, or compatible picture alternates. **All takes** opens the revision list for that scene. **Clip** mode stops at the selected scene’s end; selecting a base or alternate take enters this mode. Return to **Sequence** to watch the saved final-cut choices. These preview choices do not activate a different H3 checkpoint. |
@@ -119,7 +119,7 @@ To use an installed browser:
 SCENEWEAVER_CHROMIUM=/path/to/chrome npm run test:e2e
 ```
 
-Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
+Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, ruler scrubbing across zoom and scroll offsets, frame keys, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
 
 ## Sources
 
