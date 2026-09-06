@@ -1,0 +1,42 @@
+import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+const starter = JSON.parse(readFileSync('public/examples/h3-starter.api.json', 'utf8'));
+let target = '';
+test.beforeAll(async ({ request }) => { target = (await (await request.get('/api/connection')).json()).target; });
+test.beforeEach(async ({ request, page }) => {
+  await request.put('/api/connection', { data: { target } }); await request.post('/comfy/test/reset');
+  await page.addInitScript(prompt => localStorage.setItem('sceneweaver.project.v1', JSON.stringify({ name: 'Thumbnail test', prompt, bindings: {}, warnings: [] })), starter);
+});
+test('uses the saved alternate thumbnail in the timeline and scene bin while take previews stay independent', async ({ page, request }) => {
+  await request.post('/comfy/test/thumbnails'); await page.goto('/');
+  const first = page.getByRole('button', { name: 'Select scene 1: the_arrival', exact: true });
+  const thumbnail = first.getByRole('img', { name: 'Saved clip thumbnail: the arrival' });
+  await expect(first.locator('.checkpoint-thumbnail')).toHaveClass(/is-loaded/);
+  const url = new URL((await thumbnail.getAttribute('src'))!, page.url());
+  expect(url.pathname).toBe('/comfy/minimax_h3_context_loop/plan-studio/checkpoint-thumbnail');
+  expect(Object.fromEntries(url.searchParams)).toMatchObject({ run_name: 'sceneweaver_first_film', scene: '1', revision: 'b'.repeat(32), sceneweaver_source: target });
+  expect(await thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(160);
+  await expect(page.locator('.scene-card').first().getByRole('img')).toHaveAttribute('src', url.pathname + url.search);
+  const second = page.getByRole('button', { name: 'Select scene 2: a_moment_of_stillness', exact: true });
+  await expect(second.getByRole('img')).toHaveAttribute('src', new RegExp(`revision=${'c'.repeat(32)}`));
+  await expect(page.getByRole('button', { name: 'Select scene 3: the_departure', exact: true }).getByRole('img')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Preview scene take' }).selectOption('base');
+  await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /base.webm/);
+  await expect(thumbnail).toHaveAttribute('src', url.pathname + url.search);
+  await second.click();
+  await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /second.webm/);
+  await page.screenshot({ path: 'test-results/clip-thumbnails.png', fullPage: true });
+});
+test('falls back when a thumbnail is unavailable and loads a newly selected saved revision', async ({ page, request }) => {
+  await request.post('/comfy/test/thumbnails', { data: { unavailable: true } });
+  const failed = page.waitForResponse(response => response.url().includes('/checkpoint-thumbnail?') && response.status() === 404);
+  await page.goto('/'); await failed;
+  const first = page.getByRole('button', { name: 'Select scene 1: the_arrival', exact: true });
+  await expect(first.getByRole('img')).toHaveCount(0);
+  await expect(first.getByText('Final-cut alternate')).toBeVisible();
+  await request.post('/comfy/test/thumbnails', { data: { revision: 'd'.repeat(32) } });
+  await expect(first.locator('.checkpoint-thumbnail')).toHaveClass(/is-loaded/);
+  await expect(first.getByRole('img')).toHaveAttribute('src', new RegExp(`revision=${'d'.repeat(32)}`));
+  await page.getByRole('slider', { name: 'Timeline zoom', exact: true }).fill('2');
+  await expect(first.locator('.checkpoint-thumbnail')).toHaveClass(/is-loaded/);
+});

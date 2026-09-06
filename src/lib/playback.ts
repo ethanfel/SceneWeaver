@@ -1,6 +1,6 @@
 import type { Checkpoint, Editorial, Plan, PlaybackSegment, PreviewMedia, Revision, SubtitleCue, Value } from '../types';
 import { checkpointFor, rawFrames } from './h3';
-import { mediaUrl } from './api';
+import { H3, mediaUrl } from './api';
 
 export type SequenceEntry = PlaybackSegment & { media: PreviewMedia };
 export type SequenceSpan = { start: number; duration: number; entry?: SequenceEntry };
@@ -25,6 +25,18 @@ export function checkpointMedia(checkpoint: Checkpoint, usePresentation = true):
   return { url: mediaUrl(video), name: checkpoint.scene_id, kind: 'video', scene: checkpoint.scene, sceneId: checkpoint.scene_id,
     // H3 review MP4s already include audio; raw and alternate pictures need a WAV.
     audioUrl: replacement || !checkpoint.preview_video ? mediaUrl(checkpoint.audio) : '' };
+}
+export function checkpointThumbnailUrl(runName: string, checkpoint?: Checkpoint, server = '') {
+  if (!runName || !checkpoint?.ready || !checkpointMedia(checkpoint).url) return '';
+  // A selected replacement must have its own revision; never show the base
+  // picture underneath an alternate label when its identity is unavailable.
+  const revision = String(checkpoint.presentation_video ? checkpoint.presentation_revision || '' : checkpoint.revision).trim().toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(revision)) return '';
+  const query = new URLSearchParams({ run_name: runName, scene: String(checkpoint.scene), revision });
+  // The local proxy URL stays the same when switching ComfyUI servers. Keep
+  // their immutable thumbnail responses in separate browser cache entries.
+  if (server) query.set('sceneweaver_source', server);
+  return `/comfy${H3}/plan-studio/checkpoint-thumbnail?${query}`;
 }
 export function revisionMedia(revision: Revision, revisions: Revision[], checkpoints: Checkpoint[]): PreviewMedia {
   if (revision.take_kind !== 'editorial_alternate' && revision.alternate_media_mode !== 'picture_only') return checkpointMedia(revision, false);
