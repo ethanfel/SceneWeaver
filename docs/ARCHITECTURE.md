@@ -87,3 +87,17 @@ Then add reference-slot assignment and folder management, lineage attribution, w
 Only after the companion is sturdy, add a durable project service and a separate edit document containing tracks, clip instances, source in/out points, and absolute start frames. Media assets reference immutable H3 revisions or imported files; trims and splits must not rewrite source checkpoints or scene IDs.
 
 A later export service can render an immutable edit snapshot with FFmpeg where source files are accessible. Proxy generation, waveforms, transitions, color, subtitles, and standalone orchestration follow that foundation. GPU generation continues to use ComfyUI/H3.
+
+## H3 nightly working branches (0.4)
+
+`public/integrations/branches-core.mjs` shares explicit branch routing and response verification between the UI and parent adapter. Plan Studio’s `working_branch_id` widget takes priority; ordinary Plans carry `_branch_id` in their Plan JSON. Missing identity means Original (`main`), never the project default. Generic widget patches cannot switch branch IDs. Branch APIs and audio helpers are detected from the installed H3 frontend sources using their exact versioned import URLs.
+
+Checkpoint requests include `branch_id` for named branches and verify the response’s `working_branch_id`; older servers cannot silently substitute Original. Responses are guarded by connection generation, project, branch, and request ordering. Playback resets on branch changes, and thumbnails include branch scope. Take commands recheck the attached Plan’s branch before reads and after asynchronous ownership checks. Confirmation tickets bind the branch along with the graph evidence and workflow revision. Restoring a checkpoint preserves the Plan’s branch and does not queue generation.
+
+Named branches extend the existing browser draft scope; Original keeps its previous storage key. A remote branch switch with any outstanding edits produces a conflict before rebasing, even if the Plan’s authored text is unchanged. Reloading from ComfyUI preserves the previous branch’s backup.
+
+`processing_variants` are a separate inventory keyed by their saved metadata address. The app uses upstream stage/source classification and returned media descriptors. It never guesses stage from a profile name or treats a processed take as a generation revision. Empty processing inventories do not fall back to Original.
+
+Source-track bindings are dedicated parent commands. They compare current source options, validate distinct enabled catalog assets, normalize through the installed native helper, then submit only `options.audio_tracks` through the native ownership path. The upstream API merges that options patch. Generic asset changes remain restricted to tag, role, enabled, and lyrics. Asset metadata has no atomic compare-and-swap API; the preflight check cannot prevent concurrent same-owner writes occurring during the final request.
+
+H3 review tokens own execution routing. SceneWeaver filters reviews by `_branch_id` and does not expose generation decisions for records marked `actionable:false` after a stopped or restarted render.

@@ -78,3 +78,13 @@ test('keeps the editor reachable on a narrow screen', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/tablet.png', fullPage: true });
 });
+
+test('saved reviews from a stopped render cannot send generation decisions', async ({ page, request }) => {
+  await request.post('/comfy/test/reset');
+  await page.route('**/minimax_h3_context_loop/reviews', route => route.fulfill({ json: { reviews: [{ token: 'saved-review', run_name: 'sceneweaver_first_film', clip_index: 1, actionable: false, durable: true, recovery_instructions: 'Resume from the saved checkpoint in ComfyUI.', candidates: [{ revision: 'a'.repeat(32) }] }] } }));
+  await page.goto('/');
+  await expect(page.getByText('Saved review · resume in ComfyUI', { exact: true })).toBeVisible();
+  for (const name of ['Approve & continue', 'Retry', 'Reroll', 'Approve & stop']) await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
+  await expect(page.getByText('Resume from the saved checkpoint in ComfyUI.', { exact: true })).toBeVisible();
+  expect((await (await request.get('/comfy/test/state')).json()).decisions).toEqual([]);
+});

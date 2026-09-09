@@ -35,6 +35,7 @@ export function checkpointThumbnailUrl(runName: string, checkpoint?: Checkpoint,
   const query = new URLSearchParams({ run_name: runName, scene: String(checkpoint.scene), revision });
   // The local proxy URL stays the same when switching ComfyUI servers. Keep
   // their immutable thumbnail responses in separate browser cache entries.
+  if (checkpoint.working_branch_id && checkpoint.working_branch_id !== 'main') query.set('branch_id', checkpoint.working_branch_id);
   if (server) query.set('sceneweaver_source', server);
   return `/comfy${H3}/plan-studio/checkpoint-thumbnail?${query}`;
 }

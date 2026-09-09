@@ -1,10 +1,22 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.3.0** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.4.0** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
 ComfyUI remains the source of truth for the live workflow. H3 owns generation, continuity, project ownership, checkpoints, and assembly. Standalone editing is a later milestone.
+
+## September 2026 H3 compatibility update
+
+SceneWeaver 0.4 follows the working branch of the selected Plan. Checkpoint reads, saved-cut writes, restoration, soundtrack presentation, thumbnails, reviews, and browser draft backups retain that branch identity. The branch bar shows its name. Switching branches in Plan Studio updates the companion; unapplied drafts stay with their previous branch and require conflict resolution. An empty branch never displays Original’s clips. Branch creation, switching, authoring saves, and the project-default selection remain native Plan Studio actions.
+
+**Takes** now separates Original, DeRoPE, latent upscale, and pixel upscale inventories. Processed takes show their saved profile, dimensions, date, source identity, and missing files, with video/audio preview and download. They do not become generation checkpoints or replace the final cut automatically. Select their output path in ComfyUI’s Checkpoint Manager.
+
+**Assets** adds search, type filters, lyrics/SRT editing, and synchronized soundtrack bindings. For a source-track asset, assign enabled audio/video assets to Full mix, Vocals, and Instrumental, then apply. Keep stems at the full song length, including silence. H3 uses a full mix unchanged; without one it mixes vocals and instrumental. Scene Lip-sync and subtitle mode/offset stay in Plan Studio. Refresh its saved presentation there when changing soundtrack configuration. Assets and their metadata remain shared across branches.
+
+Recovered review gates marked non-actionable by H3 show recovery instructions with generation decisions disabled.
+
+Verified against upstream nightly [`89e238c`](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/commit/89e238c) and the running server’s branch/checkpoint inventories. Existing stable H3 projects continue to use Original; new mutations require the corresponding installed native helpers. A server that ignores a named branch is rejected for checkpoint reads and writes. This is an integration update, not a replacement for every native H3 control.
 
 ## Run
 
@@ -93,9 +105,9 @@ PreviewRelay events are shared by channel across the ComfyUI server and do not i
 ## Current boundaries
 
 - The timeline edits the generation sequence. Trimming rendered media, transitions, audio mixing, arbitrary track placement, and independent movie export are future work. Sequence timing applies saved H3 trims and placements, combines delivered clips with raw estimates, and does not resolve every H3 continuity policy for unfinished scenes in advance. Sequence playback preserves gaps and unfinished scenes. It ends at the last planned scene, even if the source soundtrack is longer. Remote clip loading can briefly buffer at cuts; this is a browser preview, not a frame-exact assembled export.
-- Subtitle text, offset, and soundtrack selection come from the saved H3 project. Change those settings in Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
+- Subtitle text and soundtrack bindings can be edited in Assets; subtitle mode/offset and the saved soundtrack presentation remain controlled by Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
 - Native reference-slot binding, folder organization, asset deletion, checkpoint deletion, lineage attribution, and workflow-local branch pinning remain in ComfyUI. The companion provides navigation to the relevant native nodes.
-- Take writes require the selected Plan and its matching Asset Carousel. Unsupported native adapters leave their actions disabled. Checkpoint activation changes the project-wide branch within its chapter and restores scene settings into the attached Plan; it does not configure Loop Start resume settings or restore model/policy wiring. Save the restored workflow in ComfyUI and inspect its generation controls before queuing.
+- Take writes require the selected Plan and its matching Asset Carousel. Unsupported native adapters leave their actions disabled. Checkpoint activation changes only the selected working branch within its chapter (other workflows selecting that same branch share those changes) and restores scene settings into the attached Plan; it does not configure Loop Start resume settings or restore model/policy wiring. Save the restored workflow in ComfyUI and inspect its generation controls before queuing.
 - Draft backups are browser-local, not server backups. Clearing browser data removes them. A renamed workflow, changed graph identity, or different SceneWeaver browser origin can require returning to the original attachment to export the old draft.
 - A live snapshot exposes named scalar widgets and links for inspection, including nested graph nodes. It is not an API execution graph. Connected inputs and native catalog/proof fields cannot be overwritten through generic input editing. Custom node controls with no scalar widget remain native.
 - Asset edits compare the displayed fields with the server before writing. H3's ownership guard remains the server authority; its current update API does not offer an atomic revision precondition for two simultaneous edits from the same owner.
@@ -126,7 +138,7 @@ To use an installed browser:
 SCENEWEAVER_CHROMIUM=/path/to/chrome npm run test:e2e
 ```
 
-Tests cover workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, A/B take audio, revision-checked final-cut writes, checkpoint impact/activation and delayed-response guards, draft recovery and workflow isolation, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, ruler scrubbing across zoom and scroll offsets, frame keys, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
+Tests cover branch-scoped reads and mutations, delayed responses after a branch switch, draft isolation, processed media, soundtrack bindings, non-actionable recovered reviews, workflow conversion, exact seeds, HTTP/WebSocket proxying, origin restrictions, live revision checks, native ownership delegation, concurrent drafts, tab/project switching, and two-window browser attachment. Browser tests use a **mock ComfyUI server**, synthetic media fixtures, and never start GPU generation. Playback checks cover separate WAV audio, source-track seeks, timed captions, selected alternate pictures and their thumbnails, A/B take audio, revision-checked final-cut writes, checkpoint impact/activation and delayed-response guards, draft recovery and workflow isolation, missing-thumbnail recovery, continuous cuts and gaps, unrendered scenes, pause/seek/restart, ruler scrubbing across zoom and scroll offsets, frame keys, clip isolation, PreviewRelay media/audio, channel isolation, delayed responses, fresh-run resets, and preview reconnects. Compatibility with a particular live workflow still needs an attachment and a controlled production trial.
 
 ## Sources
 

@@ -26,7 +26,7 @@ export async function checkpointStamp(payload) {
   // pointers, so a preview cannot silently authorize a different branch.
   // This stays in the parent adapter's single outstanding ticket. Comparing
   // serialized evidence works on plain HTTP ComfyUI hosts without Web Crypto.
-  return JSON.stringify([payload.graph_hash, payload.editorial, payload.scenes, payload.revisions, payload.checkpoints]);
+  return JSON.stringify([payload.working_branch_id, payload.graph_hash, payload.editorial, payload.scenes, payload.revisions, payload.checkpoints]);
 }
 export function checkpointImpact(payload, command, native) {
   const selected = payload.revisions?.find(item => item.scene === command.scene && item.revision === command.take_revision);

@@ -87,3 +87,12 @@ test('a tab change during asynchronous ownership validation prevents the server 
   await assert.rejects(f.adapter.command(manager(f)), /changed/);
   assert.equal(f.calls.filter(v => v.opts?.method === 'POST').length, 0);
 });
+
+test('drafts cannot silently move branches or edit their identity through Plan JSON', async () => {
+  const f = fixture(), next = structuredClone(f.base);
+  next.nodes['1'].inputs.working_branch_id = '1'.repeat(32);
+  const draft = { prompt: { '1': { class_type: 'MiniMaxH3ChainPlan', inputs: { ...f.base.nodes['1'].inputs, seed: '5' } } } };
+  assert.match(rebaseDraft(f.base, next, draft).conflicts[0], /Working branch changed/);
+  assert.equal(rebaseDraft(f.base, next, { prompt: { '1': f.base.nodes['1'] } }).conflicts.length, 0);
+  await assert.rejects(f.adapter.command(f.command('patch', { edits: [f.edit('plan_json', '{"shots":[],"_branch_id":"11111111111111111111111111111111"}')] })), /Switch working branches in Plan Studio/);
+});

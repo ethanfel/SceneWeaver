@@ -87,3 +87,29 @@ test('a late restoration response never overwrites a newer Plan edit or another 
     assert.equal(JSON.parse(f.plan.widgets[1].value).shots[0].prompt, changeProject ? 'Original' : 'Newer edit');
   }
 });
+
+test('named branch checkpoint reads, final-cut saves and restoration stay scoped to that branch', async () => {
+  const branch = '1'.repeat(32), f = fixture({ workingBranches: true });
+  f.plan.widgets[1].value = JSON.stringify({ ...JSON.parse(f.plan.widgets[1].value), _branch_id: branch });
+  f.data.working_branch_id = branch;
+  const paths = [], original = f.api.fetchApi;
+  f.api.fetchApi = (path, options) => { paths.push(path); return original(path, options); };
+  const command = (action, options = {}) => f.command(action, { revision: f.adapter.snapshot().revision, branch_id: branch, ...options });
+  await f.adapter.command(command('take-final-cut', { take_revision: f.alternate.revision, base_revision: f.base.revision, editorial_revision: f.data.editorial.revision }));
+  const preview = await f.adapter.command(command('checkpoint-preview'));
+  await f.adapter.command(command('checkpoint-activate', { ticket: preview.data.ticket }));
+  assert.ok(paths.filter(path => path !== '/queue').every(path => new URL(path, 'http://test').searchParams.get('branch_id') === branch));
+  assert.equal(JSON.parse(f.plan.widgets[1].value)._branch_id, branch);
+});
+test('a server ignoring branch routing cannot authorize a final-cut write', async () => {
+  const branch = '1'.repeat(32), f = fixture({ workingBranches: true });
+  f.plan.widgets[1].value = JSON.stringify({ ...JSON.parse(f.plan.widgets[1].value), _branch_id: branch });
+  await assert.rejects(f.adapter.command(f.command('take-final-cut', { revision: f.adapter.snapshot().revision, branch_id: branch })), /different working branch/);
+  assert.equal(f.writes.length, 0);
+});
+test('branch switches invalidate pending checkpoint confirmations even with identical saved scenes', async () => {
+  const f = fixture({ workingBranches: true }), preview = await f.adapter.command(f.command('checkpoint-preview'));
+  f.plan.widgets[1].value = JSON.stringify({ ...JSON.parse(f.plan.widgets[1].value), _branch_id: '1'.repeat(32) });
+  await assert.rejects(f.adapter.command(f.command('checkpoint-activate', { ticket: preview.data.ticket })), /workflow changed/);
+  assert.equal(f.writes.length, 0);
+});

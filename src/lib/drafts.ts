@@ -1,5 +1,6 @@
 import type { LiveSnapshot, WidgetEdit, Workflow } from '../types';
 import { diffInputs } from '../../public/integrations/bridge-core.mjs';
+import { workingBranch } from '../../public/integrations/branches-core.mjs';
 import { effectiveRunName } from './h3';
 import { liveWorkflow } from './live';
 
@@ -11,7 +12,9 @@ const privateWidget = /ownership|operation_json|catalog_json|api[_ -]?key|passwo
 export function draftScope(server: string, snapshot: LiveSnapshot, planId: string) {
   if (!snapshot.nodes[planId] || !snapshot.workflowId && !snapshot.workflowKey) return '';
   const workflow = liveWorkflow(snapshot);
-  return DRAFT_PREFIX + JSON.stringify([server.replace(/\/$/, ''), snapshot.workflowKey || snapshot.workflowId, snapshot.workflowId, planId, effectiveRunName(workflow.prompt, planId)]);
+  const branch = workingBranch(workflow.prompt[planId]?.inputs);
+  // Preserve existing Original backups, while isolating every named branch.
+  return DRAFT_PREFIX + JSON.stringify([server.replace(/\/$/, ''), snapshot.workflowKey || snapshot.workflowId, snapshot.workflowId, planId, effectiveRunName(workflow.prompt, planId), ...(branch === 'main' ? [] : [branch])]);
 }
 export function savedDraft(scope: string, base: LiveSnapshot, draft: Workflow): SavedDraft {
   return { version: 1, scope, name: base.name, updatedAt: new Date().toISOString(), edits: diffInputs(base, draft).filter(edit => !privateWidget.test(edit.widget)).map(edit => ({ ...edit, class_type: base.nodes[edit.node].class_type })) };

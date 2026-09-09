@@ -30,3 +30,15 @@ describe('live draft recovery', () => {
     current.nodes.plan.class_type = 'DifferentNode'; expect(recoverDraft(current, record).unavailable).toEqual(['plan.plan_json']);
   });
 });
+
+it('keeps Original backups compatible and isolates named branches', () => {
+  const current = structuredClone(snapshot), original = draftScope('http://comfy:8188', current, 'plan');
+  current.nodes.plan.inputs.plan_json = '{"shots":[],"_branch_id":"11111111111111111111111111111111"}';
+  const branch = draftScope('http://comfy:8188', current, 'plan');
+  expect(branch).not.toBe(original);
+  current.nodes.plan.inputs.working_branch_id = '22222222222222222222222222222222';
+  expect(draftScope('http://comfy:8188', current, 'plan')).not.toBe(branch);
+  delete current.nodes.plan.inputs.working_branch_id;
+  current.nodes.plan.inputs.plan_json = '{"shots":[],"_branch_id":"main"}';
+  expect(draftScope('http://comfy:8188', current, 'plan')).toBe(original);
+});

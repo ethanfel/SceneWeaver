@@ -19,6 +19,7 @@ const alternate = { ...baseTake, revision: 'final-alt', active: false, take_kind
 const secondTake = { ...baseTake, scene: 2, scene_id: 'a_moment_of_stillness', revision: 'second', video: media('second.webm'), audio: media('second.wav') };
 const playbackCheckpoints = [{ ...baseTake, presentation_video: media('final-alt.webm'), presentation_revision: 'final-alt', alternates: [{ revision: 'final-alt', base_revision: 'base', media_mode: 'picture_only', used_in_final_cut: true, video: media('final-alt.webm') }] }, secondTake];
 const editorial = { subtitles: { mode: 'preview_srt', asset_id: 'soundtrack', offset_seconds: 0 }, trims: [{ scene_id: 'the_arrival', out_frame: 48 }], placements: [{ scene_id: 'a_moment_of_stillness', start_frame: 240 }, { scene_id: 'the_departure', start_frame: 480 }] };
+let branchData = null;
 const soundtrackAsset = { id: 'soundtrack', tag: 'score', kind: 'audio', role: 'source_track', enabled: true, lyrics: '1\n00:00:00,000 --> 00:00:02,000\nFirst scene caption\n\n2\n00:00:10,000 --> 00:00:14,000\nSecond scene caption' };
 let assets = [{ id: 'hero', tag: 'hero', kind: 'image', role: 'picture', enabled: true, original_name: 'hero.png' }];
 const catalog = () => ({ project: 'sceneweaver_first_film', revision: String(assets[0].tag), assets: playback ? [...assets, soundtrackAsset] : assets });
@@ -32,7 +33,8 @@ app.get('/userdata/{*path}', (_req, res) => res.json(starter));
 app.get('/history/:id', (_req, res) => res.json({}));
 app.get('/minimax_h3_context_loop/reviews', (_req, res) => res.json({ reviews }));
 app.get('/minimax_h3_context_loop/runs', (_req, res) => res.json({ runs: [] }));
-app.get('/minimax_h3_context_loop/checkpoints', (_req, res, next) => takeData ? res.json(takeData) : next());
+app.get('/minimax_h3_context_loop/working-branches', (_req, res) => res.json({ branches: [{ id: 'main', name: 'Original' }, { id: '1'.repeat(32), name: 'Second cut' }] }));
+app.get('/minimax_h3_context_loop/checkpoints', (req, res, next) => takeData ? res.json(req.query.branch_id === '1'.repeat(32) ? branchData : takeData) : next());
 app.get('/minimax_h3_context_loop/checkpoints', (_req, res) => res.json(playback ? { checkpoints: thumbnails ? playbackCheckpoints.map(item => ({ ...item, revision: (item.scene === 1 ? 'a' : 'c').repeat(32), ...(item.presentation_video ? { presentation_revision: thumbnailRevision } : {}) })) : playbackCheckpoints, revisions: [baseTake, alternate, secondTake], editorial: adjacent ? { ...editorial, placements: [{ scene_id: 'a_moment_of_stillness', start_frame: 48 }, { scene_id: 'the_departure', start_frame: 156 }] } : editorial } : { checkpoints: [], revisions: [{ ...baseTake, revision: 'take-1', video: undefined, audio: undefined }] }));
 app.get('/minimax_h3_context_loop/plan-studio/presentation', (_req, res) => res.json({ run_name: 'sceneweaver_first_film', token: 'mock-audio-token', source_audio: { available: playback, seek_seconds: 2 } }));
 app.get('/minimax_h3_context_loop/plan-studio/source-audio', (_req, res) => res.sendFile(resolve('e2e/fixtures/audio.wav')));
@@ -53,12 +55,12 @@ app.get('/scripts/app.js', (_req, res) => res.type('application/javascript').sen
 app.get('/scripts/api.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-api.mjs')));
 app.get('/extensions', (_req, res) => res.json(takeData ? ['h3_project_asset_manager.js', 'h3_chain_plan_studio.js', 'h3_chain_checkpoint_manager.js'].map(name => `/extensions/h3-test/${name}`) : []));
 app.use('/extensions/h3-test', express.static(resolve('e2e/fixtures/h3-native')));
-app.get('/test/starter', (_req, res) => res.json(starter));
+app.get('/test/starter', (_req, res) => { const data = structuredClone(starter); if (branchData) data['1700'].inputs.plan_json = JSON.stringify({ ...JSON.parse(data['1700'].inputs.plan_json), _branch_id: '1'.repeat(32) }); res.json(data); });
 app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock ComfyUI open workflow</h1><button id="open">Open companion</button><script type="module">import { app } from '/scripts/app.js'; document.querySelector('#open').onclick = async () => { const child = window.open('about:blank', '_blank'); const { launch } = await import('http://127.0.0.1:4319/integrations/companion-client.mjs'); await launch(child, 'http://127.0.0.1:4319'); };</script></body></html>`));
 app.get('/minimax_h3_context_loop/project-assets', (_req, res) => res.json(catalog()));
-app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
+app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { if (req.body.asset_id === soundtrackAsset.id) Object.assign(soundtrackAsset, { ...req.body.changes, ...(req.body.changes.options ? { options: { ...soundtrackAsset.options, ...req.body.changes.options } } : {}) }); assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
 app.get('/minimax_h3_context_loop/project-assets/media', (_req, res) => res.type('image/svg+xml').send('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#334139"/><circle cx="120" cy="65" r="25" fill="#829589"/></svg>'));
-app.post('/test/reset', (_req, res) => { takeData = null; takeActions = []; pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; relayInstalled = false; relayFeeds.clear(); thumbnails = false; thumbnailUnavailable = false; thumbnailRevision = 'b'.repeat(32); res.json({}); });
+app.post('/test/reset', (_req, res) => { branchData = null; delete soundtrackAsset.options; soundtrackAsset.lyrics = '1\n00:00:00,000 --> 00:00:02,000\nFirst scene caption\n\n2\n00:00:10,000 --> 00:00:14,000\nSecond scene caption'; assets = assets.slice(0, 1); takeData = null; takeActions = []; pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; relayInstalled = false; relayFeeds.clear(); thumbnails = false; thumbnailUnavailable = false; thumbnailRevision = 'b'.repeat(32); res.json({}); });
 app.post('/test/takes', (_req, res) => {
   playback = true;
   const base = { ...baseTake, revision: 'a'.repeat(32) }, alt = { ...alternate, revision: 'b'.repeat(32), alternate_of_revision: base.revision };
@@ -68,31 +70,48 @@ app.post('/test/takes', (_req, res) => {
   takeData = { run_name: 'sceneweaver_first_film', graph_hash: 'initial', scenes: [1, 2, 3].map(scene => ({ scene })), revisions: [base, alt, second, older, third], checkpoints: [{ ...base, presentation_video: alt.video, presentation_revision: alt.revision, alternates: [{ revision: alt.revision, base_revision: base.revision, ready: true, video: alt.video, used_in_final_cut: true }] }, second, third], editorial: { ...editorial, revision: 'e'.repeat(32), chapters: [{ id: 'chapter1', title: 'First chapter', start_scene: 1 }, { id: 'chapter2', title: 'Second chapter', start_scene: 3 }], replacements: [{ scene: 1, scene_id: base.scene_id, base_revision: base.revision, alternate_revision: alt.revision, media_mode: 'picture_only' }] } };
   res.json({});
 });
+app.post('/test/branches', (_req, res) => {
+  branchData = structuredClone(takeData); branchData.working_branch_id = '1'.repeat(32);
+  branchData.revisions = branchData.revisions.map(item => ({ ...item, active: item.revision === 'd'.repeat(32), used_in_final_cut: false }));
+  branchData.checkpoints = branchData.revisions.filter(item => item.active);
+  branchData.editorial.replacements = [];
+  takeData.processing_variants = [{ ...baseTake, key: 'pixel/original.json', stage: 'pixel_upscale', profile: 'Original upscale', source_revision: 'a'.repeat(32), source_status: 'linked', video: media('original-upscale.webm') }];
+  branchData.processing_variants = [{ ...baseTake, key: 'derope/second.json', stage: 'derope', profile: 'Second cut DeRoPE', source_revision: 'd'.repeat(32), source_status: 'linked', width: 1280, height: 720, video: media('second-derope.webm'), audio: media('second-derope.wav') }];
+  res.json({});
+});
+app.post('/test/audio-tracks', (_req, res) => {
+  playback = true;
+  assets.push({ id: 'vocal-stem', tag: 'vocals', kind: 'audio', role: 'audio_reference', enabled: true }, { id: 'instrumental-stem', tag: 'instrumental', kind: 'audio', role: 'audio_reference', enabled: true });
+  soundtrackAsset.options = { timeline_mode: 'source_timeline', preserved: 'native setting' };
+  res.json({});
+});
 app.post('/test/takes/change', (_req, res) => { takeData.editorial.revision = randomUUID().replaceAll('-', ''); res.json({}); });
 app.post('/test/takes/notify', (_req, res) => { broadcast('minimax_h3_context_loop_checkpoint', {}); res.json({}); });
 app.post('/minimax_h3_context_loop/editorial', (req, res) => {
+  const data = req.query.branch_id === '1'.repeat(32) ? branchData : takeData;
   if (req.headers['x-h3-workflow-owner'] !== 'test-native-owner') return res.status(423).json({ error: 'Native ownership required' });
-  if (req.body.base_revision !== takeData?.editorial.revision) return res.status(409).json({ error: 'Saved cut changed' });
-  takeActions.push({ action: 'final-cut', body: req.body });
-  takeData.editorial = { ...req.body, revision: randomUUID().replaceAll('-', '') }; delete takeData.editorial.base_revision;
-  takeData.checkpoints = takeData.checkpoints.map(item => {
+  if (req.body.base_revision !== data?.editorial.revision) return res.status(409).json({ error: 'Saved cut changed' });
+  takeActions.push({ action: 'final-cut', body: req.body, branch: req.query.branch_id || 'main' });
+  data.editorial = { ...req.body, revision: randomUUID().replaceAll('-', '') }; delete data.editorial.base_revision;
+  data.checkpoints = data.checkpoints.map(item => {
     const replacement = req.body.replacements.find(row => row.scene === item.scene);
-    const alt = takeData.revisions.find(row => row.revision === replacement?.alternate_revision);
+    const alt = data.revisions.find(row => row.revision === replacement?.alternate_revision);
     return { ...item, presentation_revision: alt?.revision, presentation_video: alt?.video, alternates: item.alternates?.map(row => ({ ...row, used_in_final_cut: row.revision === alt?.revision })) };
   });
-  takeData.revisions = takeData.revisions.map(item => ({ ...item, used_in_final_cut: req.body.replacements.some(row => row.alternate_revision === item.revision) }));
-  res.json({ ok: true, editorial: takeData.editorial });
+  data.revisions = data.revisions.map(item => ({ ...item, used_in_final_cut: req.body.replacements.some(row => row.alternate_revision === item.revision) }));
+  res.json({ ok: true, editorial: data.editorial });
 });
 app.post('/minimax_h3_context_loop/checkpoint-revisions/restore', (req, res) => {
+  const data = req.query.branch_id === '1'.repeat(32) ? branchData : takeData;
   if (req.headers['x-h3-workflow-owner'] !== 'test-native-owner') return res.status(423).json({ error: 'Native ownership required' });
-  takeActions.push({ action: 'restore', body: req.body });
+  takeActions.push({ action: 'restore', body: req.body, branch: req.query.branch_id || 'main' });
   const inScope = item => item.scene >= req.body.scope_start_scene && item.scene <= req.body.scope_end_scene;
-  const retired = takeData.revisions.filter(item => item.active && inScope(item) && item.scene >= req.body.resume_scene);
-  takeData.revisions = takeData.revisions.map(item => inScope(item) ? { ...item, active: req.body.revisions.some(row => row.scene === item.scene && row.revision === item.revision) } : item);
-  takeData.checkpoints = takeData.revisions.filter(item => item.active);
-  takeData.graph_hash = randomUUID();
-  takeData.editorial = { ...takeData.editorial, revision: randomUUID().replaceAll('-', ''), replacements: [] };
-  res.json({ ok: true, run_name: req.body.run_name, retired_scope_pointers: retired.length, restored: takeData.revisions.filter(item => item.active && inScope(item)).map(item => ({ ...item, scene_prompt: item.prompt, effective_scene_prompt: item.prompt })) });
+  const retired = data.revisions.filter(item => item.active && inScope(item) && item.scene >= req.body.resume_scene);
+  data.revisions = data.revisions.map(item => inScope(item) ? { ...item, active: req.body.revisions.some(row => row.scene === item.scene && row.revision === item.revision) } : item);
+  data.checkpoints = data.revisions.filter(item => item.active);
+  data.graph_hash = randomUUID();
+  data.editorial = { ...data.editorial, revision: randomUUID().replaceAll('-', ''), replacements: [] };
+  res.json({ ok: true, run_name: req.body.run_name, retired_scope_pointers: retired.length, restored: data.revisions.filter(item => item.active && inScope(item)).map(item => ({ ...item, scene_prompt: item.prompt, effective_scene_prompt: item.prompt })) });
 });
 app.get('/minimax_h3_context_loop/plan-studio/checkpoint-thumbnail', (_req, res) => thumbnailUnavailable ? res.status(404).json({ error: 'Thumbnail unavailable' }) : res.set('Cache-Control', 'private, max-age=31536000, immutable').sendFile(resolve('e2e/fixtures/clip-thumbnail.jpg')));
 app.post('/test/thumbnails', (req, res) => { playback = true; thumbnails = true; thumbnailUnavailable = Boolean(req.body?.unavailable); if (req.body?.revision) thumbnailRevision = req.body.revision; broadcast('minimax_h3_context_loop_checkpoint', {}); res.json({}); });

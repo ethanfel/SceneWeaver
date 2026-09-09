@@ -1,4 +1,5 @@
 // No ComfyUI globals: the consistency rules are shared by the live adapter tests.
+import { workingBranch } from './branches-core.mjs';
 export const PROTOCOL = 'sceneweaver.live.v1';
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function validateEdits(snapshot, command) {
@@ -12,6 +13,7 @@ export function validateEdits(snapshot, command) {
     keys.add(key);
     const node = snapshot.nodes[edit.node];
     if (!node || !node.editable.includes(edit.widget)) throw new Error(`Widget ${key} is not editable through the companion.`);
+    if (edit.widget === 'working_branch_id' || edit.widget === 'plan_json' && workingBranch({ plan_json: edit.before }) !== workingBranch({ plan_json: edit.after })) throw new Error('Switch working branches in Plan Studio so its saved Plan and clip selection stay together.');
     if (!same(node.inputs[edit.widget], edit.before)) throw new Error(`Widget ${key} changed in ComfyUI.`);
     if (!['string', 'number', 'boolean'].includes(typeof edit.after) || typeof edit.after === 'number' && !Number.isFinite(edit.after)) throw new Error(`Widget ${key} needs a finite scalar value.`);
   }
@@ -31,6 +33,7 @@ export function diffInputs(base, draft) {
 export function rebaseDraft(base, next, draft) {
   if (base.binding !== next.binding) return { conflicts: ['Workflow tab changed'], draft };
   const edits = diffInputs(base, draft), conflicts = [];
+  if (edits.length && Object.entries(base.nodes).some(([id, node]) => workingBranch(node.inputs) !== workingBranch(next.nodes[id]?.inputs))) return { conflicts: ['Working branch changed in ComfyUI. Your draft is still saved for the previous branch.'], draft };
   const prompt = Object.fromEntries(Object.entries(next.nodes).map(([id, node]) => [id, { class_type: node.class_type, inputs: { ...node.inputs }, _meta: { title: node.title, mode: node.mode } }]));
   for (const edit of edits) {
     const remote = next.nodes[edit.node];

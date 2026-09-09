@@ -1,13 +1,15 @@
 import { PROTOCOL, validateEdits } from './bridge-core.mjs';
 import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
 
+import { workingBranch, branchPath, verifyBranch } from './branches-core.mjs';
+
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
 const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|access[_ -]?token/i;
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks } = {}) {
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
@@ -28,7 +30,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         for (const item of node.widgets || []) {
           if (!item.name || privateWidget.test(item.name) || !scalar(item.value)) continue;
           inputs[item.name] = item.value;
-          if (item.name !== 'catalog_json' && !['button', 'converted-widget'].includes(item.type) && !item.disabled && !item.options?.readOnly && !node.inputs?.some(input => input.name === item.name && input.link != null)) editable.push(item.name);
+          if (!['catalog_json', 'working_branch_id'].includes(item.name) && !['button', 'converted-widget'].includes(item.type) && !item.disabled && !item.options?.readOnly && !node.inputs?.some(input => input.name === item.name && input.link != null)) editable.push(item.name);
         }
         for (const input of node.inputs || []) {
           if (input.link == null) continue;
@@ -41,7 +43,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes, capabilities: { finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, capabilities: { workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     return { ...document, revision };
   }
@@ -66,14 +68,18 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       if (manager.graph !== plan.graph || String(link?.origin_id) !== String(manager.id)) throw new Error('The Plan is connected to a different asset carousel.');
     } else if (widget(plan, 'run_name')?.value !== command.project) throw new Error('The Plan no longer belongs to this project.');
     if (!snapshot().nodes[command.plan]?.editable.includes('plan_json')) throw new Error('The attached Plan JSON is controlled by a connection or is read-only.');
+    const branch = workingBranch(snapshot().nodes[command.plan].inputs);
+    if (branch !== (command.branch_id || 'main')) throw new Error('The Plan working branch changed. Refresh before managing takes.');
+    if (branch !== 'main' && !workingBranches) throw new Error('This installed H3 adapter does not support named working branches.');
     return { manager, plan };
   }
   async function readTakes(command) {
     projectPlan(command);
-    const response = await api.fetchApi(`${H3}/checkpoints?${new URLSearchParams({ run_name: command.project, include_graph: 'true' })}`);
+    const response = await api.fetchApi(branchPath(`${H3}/checkpoints?${new URLSearchParams({ run_name: command.project, include_graph: 'true' })}`, command.branch_id));
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Cannot read the saved takes.');
     if (data.run_name !== command.project || !Array.isArray(data.checkpoints) || !Array.isArray(data.revisions)) throw new Error('H3 returned unexpected checkpoint data. Refresh the project.');
+    verifyBranch(data, command.branch_id);
     projectPlan(command);
     return data;
   }
@@ -93,7 +99,8 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       requestOptions = await ownershipOptions(node, command.project, requestOptions);
     }
     assertCurrent(command); // Ownership checks yield; a tab/project may change meanwhile.
-    const response = await api.fetchApi(path, requestOptions), data = await response.json();
+    if (command.plan) projectPlan(command);
+    const response = await api.fetchApi(command.plan ? branchPath(path, command.branch_id) : path, requestOptions), data = await response.json();
     if (!response.ok) throw new Error(data.error || `H3 returned HTTP ${response.status}`);
     // A completed server write is never redirected onto a newly selected graph.
     if (snapshot().binding !== command.binding || refs.get(command.node) !== node || widget(node, 'run_name')?.value !== command.project) return { data, warning: 'The server action completed, but the ComfyUI tab or project changed. Reattach to refresh it.' };
@@ -174,7 +181,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
       if (command.action === 'checkpoint-activate') {
         const preview = previews.get(command.ticket); previews.delete(command.ticket);
-        if (!preview || ['binding', 'revision', 'node', 'plan', 'project'].some(key => preview.command[key] !== command[key])) throw new Error('Preview the checkpoint impact again before restoring it.');
+        if (!preview || ['binding', 'revision', 'node', 'plan', 'project', 'branch_id'].some(key => preview.command[key] !== command[key])) throw new Error('Preview the checkpoint impact again before restoring it.');
         const payload = await readTakes(command);
         if (await checkpointStamp(payload) !== preview.stamp) throw new Error('The checkpoint graph or saved cut changed. Preview the impact again.');
         await requireIdle();
@@ -196,6 +203,23 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
           return { data: result.data, snapshot: snapshot() };
         } catch (error) { return { data: result.data, snapshot: snapshot(), warning: `H3 restored the branch, but the Plan could not be synchronized: ${error.message}. Review it in ComfyUI before queuing.` }; }
       }
+      if (command.action === 'asset-audio-tracks') {
+        if (!audioTracks || !ownershipOptions) throw new Error('Reopen SceneWeaver from an H3 version with synchronized audio tracks.');
+        projectNode(command);
+        const response = await api.fetchApi(`${H3}/project-assets?${new URLSearchParams({ project: command.project })}`);
+        const catalog = await response.json();
+        if (!response.ok || catalog.project !== command.project) throw new Error('Cannot verify project audio tracks.');
+        const asset = catalog.assets?.find(item => item.id === command.asset_id);
+        if (!asset || asset.role !== 'source_track' || JSON.stringify(asset.options || {}) !== JSON.stringify(command.before_options || {})) throw new Error('The source track changed in ComfyUI. Refresh before applying.');
+        const tracks = command.tracks;
+        if (tracks !== null) {
+          if (!tracks || Object.keys(tracks).some(key => !['full_mix', 'vocals', 'instrumental'].includes(key)) || Object.values(tracks).some(id => typeof id !== 'string')) throw new Error('Invalid synchronized audio tracks.');
+          const ids = Object.values(tracks).filter(Boolean);
+          if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !catalog.assets.some(item => item.id === id && ['audio', 'video'].includes(item.kind) && item.enabled !== false))) throw new Error('Select distinct, enabled audio or video assets and keep at least one track.');
+        }
+        const normalized = tracks === null ? null : audioTracks.projectAudioTrackBindings({ ...asset, options: { ...asset.options, audio_tracks: tracks } });
+        return projectRequest(command, `${H3}/project-assets/update`, { project: command.project, asset_id: asset.id, changes: { options: { audio_tracks: normalized } } });
+      }
       if (command.action === 'asset-update') {
         const allowed = ['tag', 'role', 'enabled', 'lyrics'];
         if (!command.changes || Object.keys(command.changes).some(key => !allowed.includes(key))) throw new Error('Unsupported asset change.');
@@ -205,7 +229,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         const catalog = await response.json();
         if (!response.ok) throw new Error(catalog.error || 'Cannot verify the asset before editing.');
         const asset = catalog.assets?.find(asset => asset.id === command.asset_id);
-        if (!asset || Object.entries(command.before || {}).some(([key, value]) => JSON.stringify(key === 'enabled' ? asset.enabled !== false : asset[key]) !== JSON.stringify(value))) throw new Error('This asset changed in ComfyUI. Refresh the asset list before applying.');
+        if (!asset || Object.entries(command.before || {}).some(([key, value]) => JSON.stringify(key === 'enabled' ? asset.enabled !== false : key === 'lyrics' ? asset.lyrics || '' : asset[key]) !== JSON.stringify(value))) throw new Error('This asset changed in ComfyUI. Refresh the asset list before applying.');
         return projectRequest(command, `${H3}/project-assets/update`, { project: command.project, asset_id: command.asset_id, changes: command.changes });
       }
       if (command.action === 'asset-upload') {
@@ -234,9 +258,14 @@ async function h3Adapters(api) {
       if (value) { value.value = JSON.stringify(sync.serializedProjectAssetCatalog?.(catalog, project) || catalog); value.callback?.(value.value); }
       sync.publishProjectAssetCatalogChanged(node, catalog);
     } : undefined };
+    const audioPath = source.match(/["'](\.\/h3_project_asset_editor_core\.mjs[^"']*)["']/)?.[1];
+    if (audioPath) {
+      try { const audio = await import(new URL(audioPath, base).href); if (typeof audio.projectAudioTrackBindings === 'function') adapters.audioTracks = audio; } catch { /* Older H3 keeps ordinary asset controls. */ }
+    }
     const studioPath = paths.find(path => path.endsWith('/h3_chain_plan_studio.js'));
     if (studioPath) {
       const studio = await (await fetch(studioPath)).text();
+      adapters.workingBranches = studio.includes('h3_working_branches.mjs') && studio.includes('working_branch_id');
       adapters.finalCut = studio.includes('base_revision:') && studio.includes('/minimax_h3_context_loop/editorial');
     }
     try {

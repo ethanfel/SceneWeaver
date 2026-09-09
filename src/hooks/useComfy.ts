@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Checkpoint, Editorial, ComfyEvent, MediaFile, Queue, Review, Run, Schemas, Workflow } from '../types';
 import { comfy, H3, post, request } from '../lib/api';
+import { branchPath, verifyBranch } from '../../public/integrations/branches-core.mjs';
 import { parseJSON } from '../lib/workflow';
 import type { RelaySubscribe } from '../lib/previewRelay';
 
 export type Job = { id: string; status: string; node?: string; progress?: number; error?: string };
 const emptyQueue: Queue = { queue_running: [], queue_pending: [] };
-export function useComfy(runName: string, followProject = false) {
+export function useComfy(runName: string, followProject = false, branchId = 'main') {
   const [target, setTarget] = useState('http://127.0.0.1:8188');
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -28,6 +29,8 @@ export function useComfy(runName: string, followProject = false) {
     catch { clientId.current = crypto.randomUUID(); }
   }
   const tracked = useRef(new Set<string>());
+  const branchRef = useRef(branchId); branchRef.current = branchId;
+  const [checkpointScope, setCheckpointScope] = useState('');
   const runRef = useRef(runName); runRef.current = runName;
   const connectionGeneration = useRef(0);
   const checkpointRequest = useRef(0);
@@ -63,12 +66,12 @@ export function useComfy(runName: string, followProject = false) {
     if (result[2].status === 'fulfilled') setRuns(result[2].value.runs || []);
   }, []);
   const refreshCheckpoints = useCallback(async () => {
-    const name = runRef.current, generation = connectionGeneration.current, requestId = ++checkpointRequest.current;
+    const name = runRef.current, branch = branchRef.current, generation = connectionGeneration.current, requestId = ++checkpointRequest.current;
     if (!name) { setCheckpoints([]); setEditorial(null); return; }
     try {
-      const result = await comfy<{ checkpoints: Checkpoint[]; editorial?: Editorial }>(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`);
-      if (requestId === checkpointRequest.current && runRef.current === name && generation === connectionGeneration.current) { setCheckpoints(result.checkpoints || []); setEditorial(result.editorial || null); }
-    } catch (e) { if (requestId === checkpointRequest.current && runRef.current === name && generation === connectionGeneration.current) setError(String(e)); }
+      const result = verifyBranch(await comfy<{ working_branch_id?: string; checkpoints: Checkpoint[]; editorial?: Editorial }>(branchPath(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`, branch)), branch);
+      if (requestId === checkpointRequest.current && runRef.current === name && branchRef.current === branch && generation === connectionGeneration.current) { setCheckpointScope(JSON.stringify([name, branch])); setCheckpoints((result.checkpoints || []).map(item => ({ ...item, working_branch_id: branch }))); setEditorial(result.editorial || null); }
+    } catch (e) { if (requestId === checkpointRequest.current && runRef.current === name && branchRef.current === branch && generation === connectionGeneration.current) setError(String(e)); }
   }, []);
   const loadHistory = useCallback(async (id: string) => {
     const generation = connectionGeneration.current;
@@ -118,7 +121,7 @@ export function useComfy(runName: string, followProject = false) {
     if (!connected) return;
     try { sessionStorage.setItem(`sceneweaver.jobs:${target}`, JSON.stringify(jobs.slice(0, 100))); } catch { /* Do not interrupt a live render when session storage is full. */ }
   }, [jobs, target, connected]);
-  useEffect(() => { setCheckpoints([]); setEditorial(null); if (connected) { void refreshCheckpoints(); if (followProject) void refresh(); } }, [runName, connected, followProject, refresh, refreshCheckpoints]);
+  useEffect(() => { setCheckpoints([]); setEditorial(null); if (connected) { void refreshCheckpoints(); if (followProject) void refresh(); } }, [runName, branchId, connected, followProject, refresh, refreshCheckpoints]);
   useEffect(() => {
     if (!connected) return;
     let disposed = false, socket: WebSocket, timer: ReturnType<typeof setTimeout>;
@@ -183,5 +186,5 @@ export function useComfy(runName: string, followProject = false) {
     await refresh();
   };
   const receiveEvent = useCallback((event: ComfyEvent) => eventReceiver.current(event), []);
-  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints, editorial, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent, subscribePreviewRelay };
+  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints: checkpointScope === JSON.stringify([runName, branchId]) ? checkpoints : [], editorial: checkpointScope === JSON.stringify([runName, branchId]) ? editorial : null, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent, subscribePreviewRelay };
 }

@@ -1,0 +1,28 @@
+import { test, expect } from '@playwright/test';
+let target = '';
+test.beforeAll(async ({ request }) => { target = (await (await request.get('/api/connection')).json()).target; });
+test('edits full-length audio bindings and captions without dropping other native options', async ({ page, request }) => {
+  await request.put('/api/connection', { data: { target } }); await request.post('/comfy/test/reset'); await request.post('/comfy/test/takes'); await request.post('/comfy/test/audio-tracks');
+  await page.goto(`${target}/test/live`); await page.waitForFunction(() => Boolean((window as any).testComfy));
+  const popup = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open companion' }).click(); const companion = await popup;
+  await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.getByLabel('Filter asset type').selectOption('audio');
+  await companion.getByLabel('Search project assets').fill('score');
+  const card = companion.locator('.asset-card'); await expect(card).toHaveCount(1);
+  await card.getByLabel('Vocals · lip-sync driver for score').selectOption('vocal-stem');
+  await card.getByLabel('Instrumental · optional backing for score').selectOption('instrumental-stem');
+  await card.getByRole('button', { name: 'Apply audio tracks', exact: true }).click();
+  const catalog = async () => (await (await request.get('/comfy/minimax_h3_context_loop/project-assets')).json()).assets.find((asset: any) => asset.id === 'soundtrack');
+  await expect.poll(async () => (await catalog()).options.audio_tracks).toEqual({ full_mix: 'soundtrack', vocals: 'vocal-stem', instrumental: 'instrumental-stem' });
+  expect((await catalog()).options.preserved).toBe('native setting');
+  await expect(card.getByRole('button', { name: 'Apply audio tracks', exact: true })).toBeDisabled();
+  await card.getByLabel('Lyrics and captions for score').fill('1\n00:00:00,000 --> 00:00:03,000\nUpdated caption');
+  await card.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect.poll(async () => (await catalog()).lyrics).toContain('Updated caption');
+  await companion.screenshot({ path: 'test-results/audio-tracks.png', fullPage: true });
+  expect(await card.locator('.audio-tracks').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await card.getByRole('button', { name: 'Reset to single track', exact: true }).click();
+  await expect.poll(async () => (await catalog()).options.audio_tracks).toBe(null);
+  expect((await catalog()).options.preserved).toBe('native setting');
+});
