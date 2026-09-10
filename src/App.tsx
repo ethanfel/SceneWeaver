@@ -26,6 +26,10 @@ import { checkpointMedia, checkpointThumbnailUrl, playbackSegments, parseSubtitl
 
 import { workingBranch } from '../public/integrations/branches-core.mjs';
 import { BranchStatus } from './components/BranchStatus';
+import { WorkflowBinding } from './components/WorkflowBinding';
+import { WorkflowSave } from './components/WorkflowSave';
+import { CommandHistory } from './components/CommandHistory';
+import { resolvePlanBinding } from '../public/integrations/binding-core.mjs';
 
 import { version } from '../package.json';
 
@@ -44,7 +48,8 @@ export default function App() {
   const workflowRef = useRef(workflow); workflowRef.current = workflow;
   const [demoSchemas, setDemoSchemas] = useState<Schemas>({});
   const [selectedPlan, setSelectedPlan] = useState('');
-  const plans = planNodes(workflow.prompt), planId = plans.some(([id]) => id === selectedPlan) ? selectedPlan : plans[0]?.[0] || '';
+  const plans = planNodes(workflow.prompt), planId = plans.some(([id]) => id === selectedPlan) ? selectedPlan : plans.length === 1 || !location.hash.includes('sceneweaver_session') ? plans[0]?.[0] || '' : '';
+  const projectBinding = resolvePlanBinding(workflow.prompt, planId);
   const planNode = workflow.prompt[planId];
   let plan: Plan | null = null, planError = '';
   if (planNode) { try { plan = readPlan(planNode.inputs.plan_json); } catch (error) { planError = String(error); } }
@@ -93,12 +98,13 @@ export default function App() {
   const subtitleCues = useMemo(() => parseSubtitles(String(subtitleAsset?.lyrics || '')), [subtitleAsset?.lyrics]);
   const sourcePresentation = projectPlayback.presentation;
   const sourceUrl = sourcePresentation?.source_audio?.available && sourcePresentation.token ? `/comfy${H3}/plan-studio/source-audio?${new URLSearchParams({ token: sourcePresentation.token })}` : '';
-  const activeReviews = server.reviews.filter(r => (!runName || r.run_name === runName) && (r._branch_id || 'main') === branchId);
+  const activeReviews = server.reviews.filter(r => (!live.requested || Boolean(runName)) && (!runName || r.run_name === runName) && (r._branch_id || 'main') === branchId);
   const reviewTokens = activeReviews.map(review => review.token).join(',');
   const latestJob = server.jobs[0];
   const report = (message: string) => setError(message.replace(/^Error: /, ''));
   const recovery = useDraftRecovery(live.requested && new URLSearchParams(location.hash.slice(1)).get('comfy_origin') === new URL(server.target).origin, server.target, baseline, planId, workflow);
   const canWriteLive = baseCanWriteLive && !recovery.pending;
+  const canQueueLive = canWriteLive && Boolean(planId) && ['bound', 'unmanaged'].includes(projectBinding.status);
   const recovered = recovery.pending && baseline ? recoverDraft(baseline, recovery.pending) : null;
   const notify = (message: string) => { setNotice(message); setTimeout(() => setNotice(''), 6000); };
   const select = (index: number) => { setSelectionKey(value => value + 1); setPage('edit'); setSelected(Math.max(0, index)); setPreviewOverride(null); setCurrentTime(0); setTakeChoice('presentation'); };
@@ -134,7 +140,7 @@ export default function App() {
     downloadJSON(`${workflow.name.replace(/\.json$/i, '')}.sceneweaver.json`, { sceneweaver: 1, name: workflow.name, workflow: workflow.source || workflow.prompt });
     setSaved(true);
   }, [workflow, live.requested, live.command, draftEdits.length, baseline]);
-  const acceptSnapshot = (snapshot: LiveSnapshot) => { setBaseline(snapshot); setWorkflow(liveWorkflow(snapshot)); setConflicts([]); setSaved(true); };
+  const acceptSnapshot = (snapshot: LiveSnapshot) => { if (baselineRef.current?.binding !== snapshot.binding) setSelectedPlan(''); setBaseline(snapshot); setWorkflow(liveWorkflow(snapshot)); setConflicts([]); setSaved(true); };
   const applyLiveDraft = async () => {
     if (!baseline || !canWriteLive || !draftEdits.length) return;
     setBusy(true);
@@ -185,22 +191,29 @@ export default function App() {
   useEffect(() => { if (reviewTokens) setQueueOpen(true); }, [reviewTokens]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 's') { event.preventDefault(); saveProject(); }
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        if (live.requested) {
+          if (!canWriteLive || draftEdits.length) { report('Apply the prompt draft and reconnect the intended workflow before saving.'); return; }
+          void live.command('workflow-save', {}, baseline).then(result => result.warning ? report(result.warning) : notify(`Saved ${result.path}`)).catch(error => report(String(error)));
+        } else saveProject();
+        return;
+      }
       const element = event.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName) || element.isContentEditable || modal || element.closest('[role="dialog"]')) return;
       if (event.code === 'Space' && player.current) { event.preventDefault(); player.current.toggle(); }
     };
     window.addEventListener('keydown', listener); return () => window.removeEventListener('keydown', listener);
-  }, [saveProject, modal]);
+  }, [saveProject, modal, live.requested, live.command, canWriteLive, draftEdits.length, baseline]);
   const openLibrary = async () => {
     setModal('library'); setBusy(true);
     try { const items = await comfy<string[]>('/userdata?dir=workflows&recurse=true&split=false'); setLibrary(items); } catch (e) { report(String(e)); } finally { setBusy(false); }
   };
   const render = async () => {
     if (live.requested) {
-      if (!canWriteLive || draftEdits.length) { report('Apply or discard the prompt draft before queuing the live workflow.'); return; }
+      if (!canQueueLive || draftEdits.length) { report(projectBinding.issues[0] || 'Select a Plan and apply or discard the prompt draft before queuing the live workflow.'); return; }
       setBusy(true);
-      try { await live.command('queue', {}, baseline); await server.refresh(); setQueueOpen(true); notify('Queued through the original ComfyUI tab.'); } catch (e) { report(String(e)); } finally { setBusy(false); }
+      try { await live.command('queue', { plan: planId }, baseline); await server.refresh(); setQueueOpen(true); notify('Queued through the original ComfyUI tab.'); } catch (e) { report(String(e)); } finally { setBusy(false); }
       return;
     }
     const problems = [...validatePrompt(workflow.prompt, server.schemas), ...(plan ? planProblems(plan, planNode.inputs) : planError ? [planError] : [])];
@@ -230,9 +243,10 @@ export default function App() {
       <div className="project-title"><span className="project-status">{saved ? <Check size={12}/> : <span className="unsaved-dot"/>}</span><input aria-label="Project name" readOnly={live.requested} value={workflow.name} onChange={e => change({ ...workflow, name: e.target.value })}/><ChevronDown size={12}/></div>
       <div className="header-actions"><button className={`connection-status ${server.connected ? 'online' : ''}`} onClick={() => setModal('connection')}><span className={`status-dot ${server.connected ? 'green' : ''}`}/>{server.connecting ? 'Connecting…' : server.connected ? 'ComfyUI connected' : 'ComfyUI offline'}</button><button className="icon-button" onClick={() => setModal('help')} aria-label="About SceneWeaver"><CircleHelp size={17}/></button></div>
     </header>
-    <div className="top-toolbar"><div className="toolbar-actions"><button className="live-attach-button" onClick={() => setModal('attach')}><Link2 size={15}/>{live.requested ? 'Live attachment' : 'Attach live workflow'}</button><button disabled={live.requested} onClick={() => fileInput.current?.click()}><FolderOpen size={15}/>Import workflow</button><button disabled={!server.connected || live.requested} onClick={() => void openLibrary()}><ListVideo size={15}/>Server library</button><span className="divider"/><button onClick={saveProject}><Save size={14}/>{live.requested ? draftEdits.length ? 'Export draft' : 'Export workflow' : 'Save project'}</button></div><div className="toolbar-actions"><button onClick={() => setQueueOpen(v => !v)} className={queueOpen ? 'active' : ''}><Activity size={14}/>Render queue<span className="count">{server.queue.queue_running.length + server.queue.queue_pending.length}</span></button><button className="primary render-button" disabled={!server.connected || !server.socketOnline || busy || !Object.keys(workflow.prompt).length || live.requested && (!canWriteLive || Boolean(draftEdits.length))} onClick={() => void render()}>{busy ? <LoaderCircle size={14} className="spin"/> : <Play size={13} fill="currentColor"/>}{live.requested ? 'Queue in ComfyUI' : 'Render workflow'}</button></div></div>
+    <div className="top-toolbar"><div className="toolbar-actions"><button className="live-attach-button" onClick={() => setModal('attach')}><Link2 size={15}/>{live.requested ? 'Live attachment' : 'Attach live workflow'}</button><button disabled={live.requested} onClick={() => fileInput.current?.click()}><FolderOpen size={15}/>Import workflow</button><button disabled={!server.connected || live.requested} onClick={() => void openLibrary()}><ListVideo size={15}/>Server library</button><span className="divider"/><button onClick={saveProject}><Save size={14}/>{live.requested ? draftEdits.length ? 'Export draft' : 'Export workflow' : 'Save project'}</button></div><div className="toolbar-actions"><button onClick={() => setQueueOpen(v => !v)} className={queueOpen ? 'active' : ''}><Activity size={14}/>Render queue<span className="count">{server.queue.queue_running.length + server.queue.queue_pending.length}</span></button><button className="primary render-button" disabled={!server.connected || !server.socketOnline || busy || !Object.keys(workflow.prompt).length || live.requested && (!canQueueLive || Boolean(draftEdits.length))} onClick={() => void render()}>{busy ? <LoaderCircle size={14} className="spin"/> : <Play size={13} fill="currentColor"/>}{live.requested ? 'Queue in ComfyUI' : 'Render workflow'}</button></div></div>
     <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={async e => { const file = e.target.files?.[0]; if (!file) return; try { load(parseJSON(await file.text()), file.name); } catch (error) { report(String(error)); } e.target.value = ''; }}/>
     {live.requested && <div className={`live-status-bar ${wrongTab || conflicts.length ? 'conflict' : ''}`}><div><span className={`status-dot ${canWriteLive ? 'green' : 'amber'}`}/><strong>{wrongTab ? 'ComfyUI tab changed' : live.status !== 'attached' ? 'Waiting for the ComfyUI tab' : conflicts.length ? 'Concurrent edit detected' : draftEdits.length ? `${draftEdits.length} unapplied change${draftEdits.length === 1 ? '' : 's'}` : 'Attached to live workflow'}</strong><span>{baseline?.name || 'Connecting…'}</span></div><div>{wrongTab ? <button onClick={() => live.snapshot && acceptSnapshot(live.snapshot)}>Attach current tab</button> : <><button disabled={!draftEdits.length && !conflicts.length} onClick={() => live.snapshot && acceptSnapshot(live.snapshot)}>Reload from ComfyUI</button><button className="primary" disabled={!canWriteLive || !draftEdits.length || busy} onClick={() => void applyLiveDraft()}>Apply to ComfyUI</button></>}</div>{!!conflicts.length && <small>Changed in both places: {conflicts.join(', ')}. Export your draft before reloading if you want to keep it.</small>}</div>}
+    {live.requested && baseline && <div className="workflow-overview"><WorkflowBinding workflow={workflow} planId={planId} choosePlan={() => { setBin('scenes'); document.querySelector<HTMLSelectElement>('[aria-label="Active H3 plan"]')?.focus(); }}/><WorkflowSave key={baseline.binding} file={live.snapshot?.binding === baseline.binding ? live.snapshot.workflowFile : baseline.workflowFile} enabled={canWriteLive} draftCount={draftEdits.length} save={() => live.command('workflow-save', {}, baseline)} report={report}/><CommandHistory key={`commands:${baseline.binding}`} receipts={live.receipts} binding={baseline.binding} connected={live.status === 'attached'} check={id => live.command('command-status', { request_id: id })} refresh={() => live.command('snapshot')}/></div>}
     {runName && <BranchStatus project={runName} planId={planId} branchId={branchId} connected={server.connected} server={server.target} supported={baseline?.capabilities?.workingBranches} workflow={workflow} command={live.command} editable={canWriteLive}/>}
     {(error || live.error || server.error || planError) && <div className="error-banner" role="alert"><span>{error || live.error || server.error || planError}</span><button className="icon-button" onClick={() => { setError(''); server.setError(''); }} aria-label="Dismiss error"><X size={15}/></button></div>}
     {notice && <div className="toast" role="status"><Check size={14}/>{notice}</div>}
@@ -242,7 +256,7 @@ export default function App() {
         <label className="search"><Search size={13}/><input aria-label="Search media pool" placeholder={bin === 'scenes' ? 'Find a scene…' : 'Find media…'} value={search} onChange={e => setSearch(e.target.value)}/></label>
         <div className="bin-section-label"><span>{bin === 'scenes' ? 'SCENE PLAN' : 'RENDERS & REFERENCES'}</span>{bin === 'scenes' && <button className="icon-button" disabled={!plan} onClick={addScene} aria-label="New scene"><Plus size={14}/></button>}</div>
         <div className="bin-content">{bin === 'scenes' ? <>
-          {plans.length > 1 && <select aria-label="Active H3 plan" value={planId} onChange={e => { setSelectedPlan(e.target.value); select(0); }}>{plans.map(([id, node]) => <option key={id} value={id}>{nodeTitle(id, node)}</option>)}</select>}
+          {plans.length > 1 && <select aria-label="Active H3 plan" value={planId} onChange={e => { setSelectedPlan(e.target.value); select(0); }}><option value="" disabled>Choose the production Plan…</option>{plans.map(([id, node]) => <option key={id} value={id}>{nodeTitle(id, node)}</option>)}</select>}
           {plan?.shots.map((shot, index) => !`${shot.id} ${promptText(shot.prompt)}`.toLowerCase().includes(search.toLowerCase()) ? null : <button key={index} className={`scene-card ${selected === index && !previewOverride ? 'selected' : ''}`} onClick={() => { select(index); setInspectorTab('scene'); setPage('edit'); }}><div className={`scene-art tone-${index % 4}`}><span className="scene-number">{String(index + 1).padStart(2, '0')}</span><Clapperboard size={32} strokeWidth={1}/><CheckpointThumbnail url={checkpointThumbnailUrl(runName, checkpointFor(server.checkpoints, shot, index), server.target)} name={shot.id || `Scene ${index + 1}`}/><span className="scene-duration">{(rawFrames(shot, plan, planNode.inputs) / 24).toFixed(2)}s raw</span></div><div className="scene-card-info"><strong>{shot.id?.replaceAll('_', ' ') || 'Untitled scene'}</strong><span><i className={`status-dot ${checkpointFor(server.checkpoints, shot, index)?.ready ? 'green' : ''}`}/>{checkpointFor(server.checkpoints, shot, index)?.ready ? 'Rendered' : 'Not rendered'}</span></div></button>)}
           {!plan && <div className="empty-small">Import a workflow with an H3 Plan to see its scenes here.</div>}
         </> : <>
@@ -265,7 +279,7 @@ export default function App() {
           {!!workflow.warnings.length && <details className="notice"><summary>{workflow.warnings.length} import notes — review before rendering</summary>{workflow.warnings.map((warning, i) => <p key={i}>{warning}</p>)}</details>}
           <div className="workflow-node-list">{Object.entries(workflow.prompt).map(([id, node]) => <button className={`workflow-node ${selectedNode === id ? 'selected' : ''}`} key={id} onClick={() => selectNode(id)}><div className={`node-symbol ${node.class_type.includes('H3') ? 'h3' : ''}`}><GitBranch size={16}/></div><div><strong>{nodeTitle(id, node)}</strong><small>{node.class_type}</small></div><span>{Object.keys(node.inputs).length} inputs</span><ArrowUpRight size={13}/></button>)}</div>
           <div className="workflow-exports"><button disabled={live.requested} onClick={() => downloadJSON('workflow.api.json', workflow.prompt)}><ArrowDownToLine size={14}/>Export API</button><button disabled={!workflow.source} onClick={() => downloadJSON('workflow.json', workflow.source)}><ArrowDownToLine size={14}/>Export canvas</button><a className="button" href={server.target} target="_blank" rel="noreferrer">Open ComfyUI<ArrowUpRight size={13}/></a></div>
-        </div> : page === 'takes' ? <TakesPanel key={`${server.target}:${baseline?.binding || ''}:${runName}:${branchId}:${planId}`} project={runName} branchId={branchId} server={server.target} planId={planId} scene={selected + 1} workflow={workflow} connected={server.connected} editable={canWriteLive && !draftEdits.length} capabilities={baseline?.capabilities} savedVersion={JSON.stringify([server.editorial?.revision, server.checkpoints.map(item => [item.scene, item.revision, item.presentation_revision])])} command={(action, options) => live.command(action, options, baseline)} preview={showPreview} changed={server.refreshCheckpoints} report={report}/> : page === 'assets' ? <ProjectPanel key={`${server.target}:${runName}`} audioTracks={baseline?.capabilities?.audioTracks} project={runName} workflow={workflow} connected={server.connected} editable={canWriteLive && !draftEdits.length} command={live.command} preview={showPreview} report={report}/> : <div className="renders-view"><div className="section-heading"><div><h2>Rendered footage</h2><p>Saved clips and outputs for this production.</p></div><button disabled={!server.connected} onClick={() => void server.refreshCheckpoints()}><RefreshCw size={14}/>Refresh</button></div>{fileList.length ? fileList.map((item, i) => <div className="render-row" key={i}><Film size={22}/><div><strong>{item.name}</strong><small>{item.file.subfolder}</small></div><button onClick={() => item.playback ? showPreview(item.playback.url, item.name, item.playback) : viewMedia(item.file, item.name)}><Play size={13}/>Preview</button><a className="button" href={mediaUrl(item.file)} download={item.file.filename}><ArrowDownToLine size={14}/></a></div>) : <div className="empty-large"><Film size={34} strokeWidth={1}/><h3>No footage yet</h3><p>Render a workflow or browse an existing run.</p><button disabled={!server.connected} onClick={() => setModal('runs')}><FolderOpen size={14}/>Browse runs</button></div>}</div>}
+        </div> : page === 'takes' ? <TakesPanel key={`${server.target}:${baseline?.binding || ''}:${runName}:${branchId}:${planId}`} project={runName} branchId={branchId} server={server.target} planId={planId} scene={selected + 1} workflow={workflow} connected={server.connected} editable={canWriteLive && !draftEdits.length} capabilities={baseline?.capabilities} savedVersion={JSON.stringify([server.editorial?.revision, server.checkpoints.map(item => [item.scene, item.revision, item.presentation_revision])])} command={(action, options) => live.command(action, options, baseline)} preview={showPreview} changed={server.refreshCheckpoints} report={report}/> : page === 'assets' ? <ProjectPanel key={`${server.target}:${baseline?.binding || ''}:${runName}:${planId}`} audioTracks={baseline?.capabilities?.audioTracks} project={runName} planId={planId} branchId={branchId} workflow={workflow} connected={server.connected} editable={canWriteLive && !draftEdits.length} command={live.command} preview={showPreview} report={report}/> : <div className="renders-view"><div className="section-heading"><div><h2>Rendered footage</h2><p>Saved clips and outputs for this production.</p></div><button disabled={!server.connected} onClick={() => void server.refreshCheckpoints()}><RefreshCw size={14}/>Refresh</button></div>{fileList.length ? fileList.map((item, i) => <div className="render-row" key={i}><Film size={22}/><div><strong>{item.name}</strong><small>{item.file.subfolder}</small></div><button onClick={() => item.playback ? showPreview(item.playback.url, item.name, item.playback) : viewMedia(item.file, item.name)}><Play size={13}/>Preview</button><a className="button" href={mediaUrl(item.file)} download={item.file.filename}><ArrowDownToLine size={14}/></a></div>) : <div className="empty-large"><Film size={34} strokeWidth={1}/><h3>No footage yet</h3><p>Render a workflow or browse an existing run.</p><button disabled={!server.connected} onClick={() => setModal('runs')}><FolderOpen size={14}/>Browse runs</button></div>}</div>}
       </section>
       <Inspector workflow={workflow} schemas={schemas} plan={plan} planId={planId} selected={selected} nodeId={selectedNode || planId} tab={inspectorTab} setTab={setInspectorTab} updateInput={updateInput} updatePlan={updatePlan} select={select} selectNode={selectNode} editJson={() => setModal('plan-json')} report={report} connected={server.connected}/>
     </main>

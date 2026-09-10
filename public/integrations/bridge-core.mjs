@@ -34,7 +34,7 @@ export function rebaseDraft(base, next, draft) {
   if (base.binding !== next.binding) return { conflicts: ['Workflow tab changed'], draft };
   const edits = diffInputs(base, draft), conflicts = [];
   if (edits.length && Object.entries(base.nodes).some(([id, node]) => workingBranch(node.inputs) !== workingBranch(next.nodes[id]?.inputs))) return { conflicts: ['Working branch changed in ComfyUI. Your draft is still saved for the previous branch.'], draft };
-  const prompt = Object.fromEntries(Object.entries(next.nodes).map(([id, node]) => [id, { class_type: node.class_type, inputs: { ...node.inputs }, _meta: { title: node.title, mode: node.mode } }]));
+  const prompt = Object.fromEntries(Object.entries(next.nodes).map(([id, node]) => [id, { class_type: node.class_type, inputs: { ...node.inputs }, _meta: { title: node.title, mode: node.mode, inputErrors: node.inputErrors, routing: node.routing, inputSources: node.inputSources, outputSources: node.outputSources, scopeActive: node.scopeActive } }]));
   for (const edit of edits) {
     const remote = next.nodes[edit.node];
     if (!remote?.editable.includes(edit.widget) || !same(remote.inputs[edit.widget], edit.before) && !same(remote.inputs[edit.widget], edit.after)) conflicts.push(`${edit.node}.${edit.widget}`);

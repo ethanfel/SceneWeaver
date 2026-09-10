@@ -67,12 +67,12 @@ test('rejects stale final-cut choices and invalidates a checkpoint confirmation 
   const companion = await attach(page);
   await request.post('/comfy/test/takes/change');
   await take(companion, 'a').getByRole('button', { name: 'Use in final cut', exact: true }).click();
-  await expect(companion.getByText('The saved cut changed. Refresh the takes before applying this choice.', { exact: true })).toBeVisible();
+  await expect(companion.getByRole('alert').getByText('The saved cut changed. Refresh the takes before applying this choice.', { exact: true })).toBeVisible();
   await take(companion, 'd').getByRole('button', { name: 'Restore checkpoint…', exact: true }).click();
   await expect(companion.getByRole('dialog')).toBeVisible();
   await request.post('/comfy/test/takes/change');
   await companion.getByRole('button', { name: 'Restore this branch', exact: true }).click();
-  await expect(companion.getByText('The checkpoint graph or saved cut changed. Preview the impact again.', { exact: true })).toBeVisible();
+  await expect(companion.getByRole('alert').getByText('The checkpoint graph or saved cut changed. Preview the impact again.', { exact: true })).toBeVisible();
   expect((await (await request.get('/comfy/test/state')).json()).takeActions).toEqual([]);
 });
 

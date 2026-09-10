@@ -6,6 +6,12 @@ This repository contains the web app, local proxy, and live workflow bridge. The
 
 ComfyUI remains the source of truth for the live workflow. H3 owns generation, continuity, project ownership, checkpoints, and assembly. Standalone editing is a later milestone.
 
+The active development goal is documented in the [complete workflow parity plan](docs/WORKFLOW_PARITY_PLAN.md), with a [node/API/recipe coverage register](docs/planning/H3_FEATURE_COVERAGE.md) and [implementation status](docs/planning/IMPLEMENTATION_STATUS.md). Milestones remain open until their native workflows and recovery paths are verified.
+
+## Integration foundations (0.5)
+
+The first integration batch adds explicit production Plan selection, shared project binding through supported indirect connections, native saving of existing workflow files, and recoverable action receipts. “Save workflow” is separate from applying a draft or saving H3 branch authoring. Receipt checks never repeat the original action. Refresh the ComfyUI page and reopen SceneWeaver after updating to load the new browser adapter.
+
 ## September 2026 H3 compatibility update
 
 SceneWeaver 0.4 follows the working branch of the selected Plan. Checkpoint reads, saved-cut writes, restoration, soundtrack presentation, thumbnails, reviews, and browser draft backups retain that branch identity. The branch bar shows its name. Switching branches in Plan Studio updates the companion; unapplied drafts stay with their previous branch and require conflict resolution. An empty branch never displays Original’s clips. Branch creation, switching, authoring saves, and the project-default selection remain native Plan Studio actions.

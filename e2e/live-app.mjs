@@ -12,10 +12,12 @@ for (const [id, value] of Object.entries(starter)) {
 }
 const manager = { id: '9000', type: 'MiniMaxH3ProjectAssetManager', graph, widgets: [{ name: 'run_name', value: 'sceneweaver_first_film' }, { name: 'catalog_json', value: '{}' }], inputs: [] };
 graph._nodes.push(manager);
+const workflow = { path: 'workflows/Live unsaved.json', filename: 'Live unsaved.json', isPersisted: true, isTemporary: false, isModified: true, activeState: null,
+  changeTracker: { prepareForSave() { workflow.activeState = graph.serialize(); } } };
 window.nativeCallbacks = 0;
 export const app = {
   graph, canvas: { graph, selectNode(node) { window.focusedNode = node.id; }, centerOnNode() {} },
-  extensionManager: { workflow: { activeWorkflow: { path: 'workflows/Live unsaved.json', filename: 'Live unsaved.json' } } },
+  extensionManager: { workflow: { activeWorkflow: workflow, async saveWorkflow(target) { window.savedWorkflow = structuredClone({ path: target.path, graph: target.activeState }); target.isModified = false; } } },
   async queuePrompt() {
     const prompt = Object.fromEntries(graph._nodes.map(node => [node.id, { class_type: node.type, inputs: { ...Object.fromEntries(node.widgets.map(w => [w.name, w.value])), ...Object.fromEntries(node.inputs.map(input => { const link = graph.links[input.link]; return [input.name, [link.origin_id, link.origin_slot]]; })) } }]));
     const response = await api.fetchApi('/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, client_id: 'native-comfy-client', extra_data: { native_queue_hook: true } }) });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowUpRight, Check, FolderOpen, Image, Music2, RefreshCw, Upload } from 'lucide-react';
 import type { LiveResult, PreviewMedia, ProjectAsset, ProjectCatalog, Workflow } from '../types';
 import { comfy, H3 } from '../lib/api';
+import { resolvePlanBinding } from '../../public/integrations/binding-core.mjs';
 
 type Command = (action: string, options?: Record<string, unknown>) => Promise<LiveResult>;
 type Mutate = (action: string, options: Record<string, unknown>) => Promise<void>;
@@ -41,11 +42,11 @@ function AssetCard({ asset, assets, project, mutate, preview, editable, audioTra
     {sound && asset.role === 'source_track' && (audioTracks ? <AudioTracks asset={asset} assets={assets} editable={editable && !dirty} mutate={mutate}/> : <p className="hint">Open the Asset Carousel to manage soundtrack stems. Refresh ComfyUI and reopen SceneWeaver to detect synchronized audio support.</p>)}
   </div></article>;
 }
-export function ProjectPanel({ project, workflow, connected, editable, audioTracks, command, preview, report }: { project: string; workflow: Workflow; connected: boolean; editable: boolean; audioTracks?: boolean; command: Command; preview: (url: string, name: string, details?: Partial<PreviewMedia>) => void; report: (error: string) => void }) {
+export function ProjectPanel({ project, planId, branchId, workflow, connected, editable, audioTracks, command, preview, report }: { project: string; planId: string; branchId: string; workflow: Workflow; connected: boolean; editable: boolean; audioTracks?: boolean; command: Command; preview: (url: string, name: string, details?: Partial<PreviewMedia>) => void; report: (error: string) => void }) {
   const [catalog, setCatalog] = useState<ProjectCatalog | null>(null), [busy, setBusy] = useState(false), [inputPath, setInputPath] = useState(''), [search, setSearch] = useState(''), [kind, setKind] = useState('all'), [writing, setWriting] = useState(false);
   const requestRef = useRef<AbortController | null>(null), epoch = useRef(0), reportRef = useRef(report); reportRef.current = report;
-  const managers = Object.entries(workflow.prompt).filter(([, node]) => node.class_type === 'MiniMaxH3ProjectAssetManager' && node.inputs.run_name === project);
-  const manager = managers.length === 1 ? managers[0][0] : undefined;
+  const binding = resolvePlanBinding(workflow.prompt, planId);
+  const manager = binding.status === 'bound' && binding.project === project ? binding.managerId : undefined;
   const catalogVersion = manager ? workflow.prompt[manager].inputs.catalog_json : '';
   const read = useCallback(async () => {
     requestRef.current?.abort(); if (!project || !connected) return;
@@ -61,7 +62,7 @@ export function ProjectPanel({ project, workflow, connected, editable, audioTrac
   const mutate: Mutate = async (action, options) => {
     if (!manager || !editable || writing) { report('Attach the live project and apply its prompt draft before managing assets.'); return; }
     const started = epoch.current; setWriting(true);
-    try { const result = await command(action, { node: manager, project, ...options }); if (result.warning) reportRef.current(result.warning); if (epoch.current === started) await read(); }
+    try { const result = await command(action, { node: manager, plan: planId, branch_id: branchId, project, ...options }); if (result.warning) reportRef.current(result.warning); if (epoch.current === started) await read(); }
     catch (error) { reportRef.current(String(error)); } finally { setWriting(false); }
   };
   if (!project) return <div className="empty-large"><FolderOpen size={32}/><h3>Attach an H3 project</h3><p>The selected workflow’s Plan and Asset Carousel identify its project.</p></div>;
@@ -69,7 +70,7 @@ export function ProjectPanel({ project, workflow, connected, editable, audioTrac
   return <div className="project-panel"><div className="section-heading"><div><h2>Project assets</h2><p>{project} · assets are shared across working branches</p></div><button disabled={busy || writing || !connected} onClick={() => void read()}><RefreshCw size={13}/>{busy ? 'Reading…' : 'Refresh'}</button></div>
     <div className="project-actions"><label className={`button ${!editable || !manager ? 'disabled' : ''}`}><Upload size={14}/>Upload to project<input type="file" hidden accept="image/*,video/*,audio/*" disabled={!editable || !manager || busy || writing} onChange={async e => { const input = e.currentTarget, file = input.files?.[0]; if (file) await mutate('asset-upload', { file, filename: file.name }); input.value = ''; }}/></label>{manager && editable && <button onClick={() => void command('focus', { node: manager }).catch(e => report(String(e)))}><ArrowUpRight size={13}/>Show carousel in ComfyUI</button>}</div>
     {!editable && <p className="hint">Attach the live workflow and apply its prompt draft to manage assets. Existing assets remain available for preview and download.</p>}
-    {managers.length > 1 && <p className="hint">This workflow has several asset carousels for this project. Manage assets in ComfyUI to choose the intended carousel.</p>}
+    {binding.issues.map(issue => <p className="hint" key={issue}>{issue}</p>)}
     <div className="asset-import"><input aria-label="ComfyUI input media path" placeholder="Existing ComfyUI input path, e.g. references/hero.png" value={inputPath} onChange={e => setInputPath(e.target.value)} disabled={!editable || !manager}/><button disabled={!editable || !manager || !inputPath.trim() || busy || writing} onClick={() => void mutate('asset-import', { path: inputPath })}><FolderOpen size={13}/>Import</button></div>
     <div className="asset-filters"><input aria-label="Search project assets" placeholder="Find a tag, filename or role…" value={search} onChange={e => setSearch(e.target.value)}/><select aria-label="Filter asset type" value={kind} onChange={e => setKind(e.target.value)}>{['all', 'image', 'video', 'audio'].map(value => <option key={value}>{value}</option>)}</select><span>{visible.length} assets</span></div>
     <div className="asset-grid">{visible.map(asset => <AssetCard key={`${project}:${asset.id}`} asset={asset} assets={catalog?.assets || []} project={project} editable={editable && Boolean(manager) && !writing} audioTracks={audioTracks} preview={preview} mutate={mutate}/>)}</div>

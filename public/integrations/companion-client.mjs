@@ -2,6 +2,9 @@ import { PROTOCOL, validateEdits } from './bridge-core.mjs';
 import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
 
 import { workingBranch, branchPath, verifyBranch } from './branches-core.mjs';
+import { resolvePlanBinding, workflowBindings } from './binding-core.mjs';
+import { saveWorkflowFile, workflowFileStatus } from './workflow-file.mjs';
+import { createCommandSession } from './command-session.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -13,20 +16,40 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
-  function root() { return app.graph?.rootGraph || app.graph; }
+  const effectsStarted = new WeakSet();
+  function root() { return app.rootGraph || app.graph?.rootGraph || app.graph; }
   function describe() {
     const graph = root(), active = app.extensionManager?.workflow?.activeWorkflow;
     if (!graph) throw new Error('ComfyUI has no open graph.');
     if (!bindings.has(graph)) bindings.set(graph, token());
-    const identity = String(active?.activeState?.id || active?.path || graph.id || bindings.get(graph));
+    const identity = String(active?.path || active?.activeState?.id || graph.id || bindings.get(graph));
     return { binding: `${identity}:${bindings.get(graph)}`, workflowId: String(graph.id || ''), workflowKey: String(active?.path || graph.id || identity), name: String(active?.filename || active?.path || 'Unsaved ComfyUI workflow') };
   }
   function snapshot() {
     const descriptor = describe(), nodes = {}; refs.clear();
-    function visit(graph, prefix = '', seen = new Set()) {
-      if (seen.has(graph)) return; seen.add(graph);
+    const graphPrefixes = new WeakMap();
+    const graphLink = (graph, id) => graph.links?.get?.(id) || graph.links?.[id];
+    function source(graph, link, prefix, boundary, depth = 0) {
+      if (!link || depth > 64) return null;
+      if (graph.inputNode && String(link.origin_id) === String(graph.inputNode.id)) {
+        if (!boundary || [2, 4].includes(boundary.node.mode)) return null;
+        const input = boundary.node.inputs?.[link.origin_slot];
+        return input?.link == null ? null : source(boundary.graph, graphLink(boundary.graph, input.link), boundary.prefix, boundary.parent, depth + 1);
+      }
+      return [prefix + link.origin_id, link.origin_slot];
+    }
+    function visit(graph, prefix = '', seen = new Set(), boundary = null, scopeActive = true) {
+      if (seen.has(graph)) {
+        // Shared definitions do not provide an independent editable node object
+        // per instance. Do not silently bind one instance using another's inputs.
+        const originalPrefix = graphPrefixes.get(graph);
+        for (const [id, node] of Object.entries(nodes)) if (id.startsWith(originalPrefix)) { node.scopeActive = false; node.editable = []; }
+        return;
+      }
+      seen.add(graph);
+      graphPrefixes.set(graph, prefix);
       for (const node of graph._nodes || []) {
-        const id = prefix + node.id, inputs = {}, editable = [];
+        const id = prefix + node.id, inputs = {}, editable = [], inputErrors = [], inputSources = {};
         for (const item of node.widgets || []) {
           if (!item.name || privateWidget.test(item.name) || !scalar(item.value)) continue;
           inputs[item.name] = item.value;
@@ -34,18 +57,35 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         }
         for (const input of node.inputs || []) {
           if (input.link == null) continue;
-          const link = graph.links?.get?.(input.link) || graph.links?.[input.link];
-          if (link) inputs[input.name] = [prefix + link.origin_id, link.origin_slot];
+          const link = graphLink(graph, input.link);
+          if (link) {
+            inputs[input.name] = [prefix + link.origin_id, link.origin_slot];
+            const resolved = source(graph, link, prefix, boundary);
+            if (!resolved) inputErrors.push(input.name);
+            else if (resolved[0] !== inputs[input.name][0]) inputSources[input.name] = resolved;
+          }
+          else inputErrors.push(input.name);
         }
-        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable };
+        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable, inputErrors, inputSources, scopeActive,
+          ...((node.comfyClass || node.type) === 'GetNode' ? { routing: { busAncestors: typeof node.resolveVirtualOutput === 'function' } } : {}) };
         refs.set(id, node);
-        if (node.subgraph) visit(node.subgraph, `${id}/`, seen);
+        if (node.subgraph) {
+          const child = { node, graph, prefix, parent: boundary }, childPrefix = `${id}/`;
+          nodes[id].outputSources = {};
+          for (const [index, slot] of (node.subgraph.outputNode?.slots || []).entries()) {
+            try {
+              const links = slot.getLinks?.() || [];
+              nodes[id].outputSources[index] = links.length === 1 ? source(node.subgraph, links[0], childPrefix, child) : null;
+            } catch { nodes[id].outputSources[index] = null; }
+          }
+          visit(node.subgraph, childPrefix, seen, child, scopeActive && ![2, 4].includes(node.mode));
+        }
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes, capabilities: { workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
-    return { ...document, revision };
+    return { ...document, revision, workflowFile: workflowFileStatus(app) };
   }
   const assertCurrent = command => {
     const current = snapshot();
@@ -53,20 +93,19 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     return current;
   };
   function projectNode(command) {
-    assertCurrent(command);
+    const current = assertCurrent(command);
     const node = refs.get(command.node);
     if (!node || (node.comfyClass || node.type) !== 'MiniMaxH3ProjectAssetManager' || widget(node, 'run_name')?.value !== command.project) throw new Error('The asset carousel no longer belongs to the attached project.');
+    if (command.plan) {
+      const binding = resolvePlanBinding(current.nodes, command.plan);
+      if (binding.status !== 'bound' || binding.managerId !== command.node || binding.project !== command.project) throw new Error(`The Plan is connected to a different asset carousel or its binding is unresolved. ${binding.issues.join(' ')}`);
+    }
     return node;
   }
   function projectPlan(command) {
     const manager = projectNode(command), plan = refs.get(command.plan);
     if (!plan || !['MiniMaxH3ChainPlan', 'MiniMaxH3ChainPlanModern', 'MiniMaxH3ChainPlanStudio'].includes(plan.comfyClass || plan.type) || !widget(plan, 'plan_json')) throw new Error('Select the attached H3 Plan before managing takes.');
     if ((plan.comfyClass || plan.type) === 'MiniMaxH3ChainPlanStudio' && plan.inputs?.some(input => input.name === 'plan' && input.link != null)) throw new Error('Select the upstream Plan instead of its connected Plan Studio before managing takes.');
-    const input = plan.inputs?.find(item => item.name === 'project_assets' && item.link != null);
-    if (input) {
-      const link = plan.graph.links?.get?.(input.link) || plan.graph.links?.[input.link];
-      if (manager.graph !== plan.graph || String(link?.origin_id) !== String(manager.id)) throw new Error('The Plan is connected to a different asset carousel.');
-    } else if (widget(plan, 'run_name')?.value !== command.project) throw new Error('The Plan no longer belongs to this project.');
     if (!snapshot().nodes[command.plan]?.editable.includes('plan_json')) throw new Error('The attached Plan JSON is controlled by a connection or is read-only.');
     const branch = workingBranch(snapshot().nodes[command.plan].inputs);
     if (branch !== (command.branch_id || 'main')) throw new Error('The Plan working branch changed. Refresh before managing takes.');
@@ -96,10 +135,12 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     let requestOptions = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...options };
     if (ownershipOptions || widget(node, 'ownership_json')) {
       if (!ownershipOptions) throw new Error('This H3 version requires its native ownership adapter. Use the Project Asset Carousel in ComfyUI.');
+      effectsStarted.add(command);
       requestOptions = await ownershipOptions(node, command.project, requestOptions);
     }
     assertCurrent(command); // Ownership checks yield; a tab/project may change meanwhile.
     if (command.plan) projectPlan(command);
+    effectsStarted.add(command);
     const response = await api.fetchApi(command.plan ? branchPath(path, command.branch_id) : path, requestOptions), data = await response.json();
     if (!response.ok) throw new Error(data.error || `H3 returned HTTP ${response.status}`);
     // A completed server write is never redirected onto a newly selected graph.
@@ -118,9 +159,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     }
     return { data, snapshot: snapshot() };
   }
-  return {
-    snapshot,
-    async command(command) {
+  async function execute(command) {
       if (command.action === 'snapshot') return { snapshot: snapshot() };
       if (command.action === 'patch') {
         const current = snapshot(), edits = validateEdits(current, command);
@@ -130,6 +169,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         graph.beforeChange?.();
         try {
           // Check all widgets before writing any, and run native widget callbacks.
+          effectsStarted.add(command);
           for (const { edit, item } of changes) item.value = edit.after;
           for (const { edit, item, node } of changes) item.callback?.call(item, edit.after, app.canvas, node, app.canvas?.graph_mouse, {});
           graph.change?.(); graph.setDirtyCanvas?.(true, true);
@@ -143,6 +183,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         assertCurrent(command);
         return { workflow: root().serialize(), name: describe().name };
       }
+      if (command.action === 'workflow-save') {
+        assertCurrent(command);
+        const result = await saveWorkflowFile(app, () => assertCurrent(command), () => effectsStarted.add(command));
+        return { ...result, saved: true, snapshot: snapshot() };
+      }
       if (command.action === 'focus') {
         assertCurrent(command);
         const node = refs.get(command.node);
@@ -151,11 +196,17 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         return { ok: true };
       }
       if (command.action === 'queue') {
-        assertCurrent(command);
+        const current = assertCurrent(command);
+        if (!command.plan && current.projectBindings.plans.length > 1) throw new Error('Select the production Plan before queuing this workflow.');
+        if (command.plan) {
+          const binding = resolvePlanBinding(current.nodes, command.plan);
+          if (!['bound', 'unmanaged'].includes(binding.status)) throw new Error(binding.issues.join(' ') || 'The production Plan is not bound.');
+        }
         // The native queue path retains frontend hooks, ownership proofs, seeds,
         // subgraph expansion, and custom node serialization.
+        effectsStarted.add(command);
         const queued = await app.queuePrompt(0, 1);
-        if (queued === false) throw new Error('ComfyUI rejected the queue request. Check its validation message.');
+        if (queued === false) throw Object.assign(new Error('ComfyUI rejected the queue request. Check its validation message.'), { outcome: 'rejected' });
         return { queued: true, snapshot: snapshot() };
       }
       if (command.action === 'take-final-cut') {
@@ -239,6 +290,16 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
       if (command.action === 'asset-import') return projectRequest(command, `${H3}/project-assets/import`, { project: command.project, source: 'input', path: command.path, role: command.role || '', tag: command.tag || '' });
       throw new Error('Unsupported companion action.');
+  }
+  return {
+    snapshot,
+    async command(command) {
+      try { return await execute(command); }
+      catch (error) {
+        const failure = error instanceof Error ? error : new Error(String(error));
+        if (!failure.outcome) failure.outcome = effectsStarted.has(command) ? 'uncertain' : 'rejected';
+        throw failure;
+      } finally { effectsStarted.delete(command); }
     },
   };
 }
@@ -298,18 +359,20 @@ export async function launch(child, companionOrigin = new URL(import.meta.url).o
   if (globalThis.__sceneweaverCompanion) globalThis.__sceneweaverCompanion.stop();
   const [{ app }, { api }] = await Promise.all([import(new URL('/scripts/app.js', location.origin).href), import(new URL('/scripts/api.js', location.origin).href)]);
   const adapter = createAdapter(app, api, await h3Adapters(api));
-  const session = token(); let stopped = false, ready = false, processing = false;
+  const session = token(); let stopped = false, ready = false;
   const send = message => { if (!stopped && !child.closed) child.postMessage({ protocol: PROTOCOL, session, ...message }, companionOrigin); };
+  const commands = createCommandSession(adapter, receipt => send({ kind: 'receipt', receipt }));
   const listener = async event => {
     if (event.source !== child || event.origin !== companionOrigin || event.data?.protocol !== PROTOCOL || event.data.session !== session) return;
     const message = event.data;
-    if (message.kind === 'hello') { ready = true; send({ kind: 'snapshot', snapshot: adapter.snapshot() }); return; }
+    if (message.kind === 'hello') {
+      ready = true;
+      try { send({ kind: 'snapshot', snapshot: adapter.snapshot() }); send({ kind: 'receipts', receipts: commands.recent() }); }
+      catch (error) { send({ kind: 'unavailable', error: error.message }); }
+      return;
+    }
     if (message.kind !== 'command') return;
-    if (processing) { send({ kind: 'result', id: message.id, error: 'Another companion action is in progress.' }); return; }
-    processing = true;
-    try { send({ kind: 'result', id: message.id, result: await adapter.command(message.command) }); }
-    catch (error) { send({ kind: 'result', id: message.id, error: error.message }); }
-    finally { processing = false; }
+    send({ kind: 'result', id: message.id, ...await commands.execute(message.id, message.command) });
   };
   window.addEventListener('message', listener);
   const events = ['execution_start', 'executing', 'progress', 'execution_success', 'execution_error', 'execution_interrupted'];
@@ -317,7 +380,8 @@ export async function launch(child, companionOrigin = new URL(import.meta.url).o
   events.forEach(name => api.addEventListener(name, forward));
   const interval = setInterval(() => {
     if (child.closed) { stop(); return; }
-    if (ready && !processing) { try { send({ kind: 'snapshot', snapshot: adapter.snapshot() }); } catch (error) { send({ kind: 'unavailable', error: error.message }); } }
+    if (ready && commands.processing) send({ kind: 'heartbeat' });
+    if (ready && !commands.processing) { try { send({ kind: 'snapshot', snapshot: adapter.snapshot() }); } catch (error) { send({ kind: 'unavailable', error: error.message }); } }
   }, 2000);
   function stop() { stopped = true; clearInterval(interval); window.removeEventListener('message', listener); events.forEach(name => api.removeEventListener(name, forward)); }
   globalThis.__sceneweaverCompanion = { stop };

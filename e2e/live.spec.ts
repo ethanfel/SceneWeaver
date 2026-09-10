@@ -12,17 +12,93 @@ async function attach(page: Page) {
   return companion;
 }
 const nativeDirection = (page: Page) => page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((n: any) => n.id === '1700').widgets.find((w: any) => w.name === 'plan_json').value).shots[0].prompt);
+test('requires an explicit production Plan when another authoring Plan appears', async ({ page }) => {
+  const companion = await attach(page);
+  await page.evaluate(() => {
+    const graph = (window as any).testComfy.graph, original = graph._nodes.find((node: any) => node.id === '1700');
+    graph._nodes.push({ ...original, id: 'second-plan', title: 'Second production', widgets: original.widgets.map((item: any) => ({ ...item })), inputs: original.inputs.map((item: any) => ({ ...item })) });
+  });
+  await expect(companion.getByText('Select the production Plan', { exact: true })).toBeVisible();
+  await expect(companion.getByRole('button', { name: 'Queue in ComfyUI' })).toBeDisabled();
+  await companion.getByRole('combobox', { name: 'Active H3 plan' }).selectOption('1700');
+  await expect(companion.getByText('Project binding verified', { exact: true })).toBeVisible();
+  await expect(companion.getByRole('textbox', { name: 'Scene direction', exact: true })).toHaveValue('Unsaved direction from ComfyUI');
+  await expect(companion.getByRole('button', { name: 'Queue in ComfyUI' })).toBeEnabled();
+});
+
+test('recovers a completed save receipt after the companion loses its result and reloads', async ({ page }) => {
+  const companion = await attach(page);
+  await page.evaluate(() => {
+    const store = (window as any).testComfy.extensionManager.workflow, original = store.saveWorkflow;
+    (window as any).saveCalls = 0;
+    store.saveWorkflow = async (workflow: any) => { (window as any).saveCalls++; await original(workflow); };
+  });
+  await companion.evaluate(() => window.addEventListener('message', event => {
+    if (event.data?.protocol === 'sceneweaver.live.v1' && event.data.kind === 'result' && event.data.result?.saved) event.stopImmediatePropagation();
+  }, { capture: true }));
+  await companion.getByRole('button', { name: 'Save workflow', exact: true }).click();
+  await expect(companion.locator('.command-history summary')).toHaveText('Actions · Completed');
+  await companion.reload();
+  await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
+  await companion.locator('.command-history summary').click();
+  await expect(companion.locator('.command-history article')).toContainText('Save workflow');
+  await expect(companion.locator('.command-history article')).toContainText('Completed');
+  expect(await page.evaluate(() => (window as any).saveCalls)).toBe(1);
+});
+
+test('checking an uncertain queue result never resubmits generation', async ({ page, request }) => {
+  const companion = await attach(page);
+  await page.evaluate(() => {
+    const app = (window as any).testComfy, original = app.queuePrompt;
+    app.queuePrompt = async () => { await original(); throw new Error('Native response lost after submission'); };
+  });
+  await companion.getByRole('button', { name: 'Queue in ComfyUI' }).click();
+  await expect(companion.locator('.command-history summary')).toHaveText('Actions · Result unknown');
+  await companion.locator('.command-history summary').click();
+  await companion.getByRole('button', { name: 'Check result', exact: true }).click();
+  await expect(companion.getByRole('button', { name: 'Check result', exact: true })).toBeEnabled();
+  expect((await (await request.get('/comfy/test/state')).json()).submissions).toHaveLength(1);
+  await companion.reload();
+  await expect(companion.locator('.command-history summary')).toHaveText('Actions · Result unknown');
+  expect((await (await request.get('/comfy/test/state')).json()).submissions).toHaveLength(1);
+});
+
+test('edits the wired Carousel through Get/Set even when another Carousel has the same project name', async ({ page }) => {
+  const companion = await attach(page);
+  await page.evaluate(() => {
+    const graph = (window as any).testComfy.graph, manager = graph._nodes.find((node: any) => node.id === '9000');
+    graph._nodes.push({ ...manager, id: '9001', title: 'Bound project assets', widgets: manager.widgets.map((item: any) => ({ ...item })), inputs: [] });
+    graph._nodes.push({ id: 'get-assets', type: 'GetNode', graph, widgets: [{ name: 'Constant', value: 'project-assets' }], inputs: [] });
+    graph._nodes.push({ id: 'set-assets', type: 'SetNode', graph, widgets: [{ name: 'Constant', value: 'project-assets' }], inputs: [{ name: '*', link: 90001 }] });
+    graph.links[90001] = { origin_id: '9001', origin_slot: 0 };
+    graph.links[90002] = { origin_id: 'get-assets', origin_slot: 0 };
+    graph._nodes.find((node: any) => node.id === '1700').inputs.push({ name: 'project_assets', link: 90002 });
+  });
+  await companion.locator('.workflow-binding summary').click();
+  await expect(companion.locator('.binding-details')).toContainText('Bound project assets');
+  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('bound-hero');
+  await companion.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(companion.getByRole('textbox', { name: 'Tag for bound-hero', exact: true })).toBeVisible();
+  const catalogs = await page.evaluate(() => (window as any).testComfy.graph._nodes.filter((node: any) => ['9000', '9001'].includes(node.id)).map((node: any) => node.widgets.find((item: any) => item.name === 'catalog_json').value));
+  expect(catalogs[0]).toBe('{}'); expect(JSON.parse(catalogs[1]).assets[0].tag).toBe('bound-hero');
+});
+
 test('attaches unsaved state, explicitly applies a prompt, queues natively, and exports the original canvas', async ({ page, request }) => {
   const companion = await attach(page), errors: string[] = []; companion.on('pageerror', e => errors.push(e.message));
   const direction = companion.getByRole('textbox', { name: 'Scene direction', exact: true });
   await expect(direction).toHaveValue('Unsaved direction from ComfyUI');
   await direction.fill('Companion direction');
+  await expect(companion.getByRole('button', { name: 'Save workflow', exact: true })).toBeDisabled();
   await expect(companion.getByRole('button', { name: 'Queue in ComfyUI' })).toBeDisabled();
   expect(await nativeDirection(page)).toBe('Unsaved direction from ComfyUI');
   await companion.getByRole('button', { name: 'Apply to ComfyUI', exact: true }).click();
   await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
   expect(await nativeDirection(page)).toBe('Companion direction');
   expect(await page.evaluate(() => (window as any).nativeCallbacks)).toBeGreaterThan(0);
+  await companion.getByRole('button', { name: 'Save workflow', exact: true }).click();
+  await expect(companion.getByText('Saved workflows/Live unsaved.json', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse((window as any).savedWorkflow.graph.nodes.find((node: any) => node.id === '1700').widgets_values.find((value: any) => typeof value === 'string' && value.includes('Companion direction'))).shots[0].prompt)).toBe('Companion direction');
   await companion.getByRole('button', { name: 'Queue in ComfyUI' }).click();
   await expect(companion.getByText('Queued', { exact: true })).toBeVisible();
   const state = await (await request.get('/comfy/test/state')).json();

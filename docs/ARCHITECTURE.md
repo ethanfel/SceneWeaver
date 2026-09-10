@@ -25,7 +25,7 @@ Queueing calls ComfyUI's native `app.queuePrompt`, preserving its serialization 
 
 ## Native project integration
 
-Project identity is derived from the selected Plan and its directly connected Asset Carousel. Asset changes are explicit parent-tab commands. The adapter imports the ownership and catalog-sync helpers with the exact versioned module URLs used by the installed H3 carousel, so it shares the existing owner controller. It performs normal ownership checks, never force ownership.
+Project identity is derived through a shared Plan/Carousel resolver. It follows supported direct, reroute, Get/Set and subgraph-boundary connections; otherwise one active Carousel with the exact project name may bind an unconnected Plan. Ambiguous or broken connected paths never fall back to a different Carousel. Several authoring Plans require explicit selection. Asset changes are explicit parent-tab commands. The adapter imports the ownership and catalog-sync helpers with the exact versioned module URLs used by the installed H3 carousel, so it shares the existing owner controller. It performs normal ownership checks, never force ownership.
 
 Asset updates verify original displayed fields before submitting. Uploads put project/role/tag fields before the multipart file, as required by H3. Imports use ComfyUI input-relative paths. Completed catalogs update the original node widget and publish the native synchronization event. A changed tab, manager, or project prevents delayed responses from updating the new graph. Backend ownership and mutation validation remain H3's responsibility; the upstream asset API does not currently expose an atomic compare-and-swap revision condition.
 

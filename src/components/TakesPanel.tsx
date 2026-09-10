@@ -9,6 +9,7 @@ import { CheckpointThumbnail } from './CheckpointThumbnail';
 import { Modal } from './Controls';
 
 import { branchPath, verifyBranch } from '../../public/integrations/branches-core.mjs';
+import { resolvePlanBinding } from '../../public/integrations/binding-core.mjs';
 
 type Impact = { ticket: string; mode: string; scope: { title: string; start: number; end: number }; changed: Revision[]; retired: Revision[]; restored: Revision[]; outsideDependents: Revision[] };
 type Props = { project: string; branchId: string; server: string; planId: string; scene: number; workflow: Workflow; connected: boolean; editable: boolean; capabilities?: LiveSnapshot['capabilities']; savedVersion: string; command: (action: string, options?: Record<string, unknown>) => Promise<LiveResult>; preview: (url: string, name: string, details?: Partial<PreviewMedia>) => void; changed: () => Promise<void>; report: (message: string) => void };
@@ -53,9 +54,8 @@ export function TakesPanel({ project, branchId, server, planId, scene, workflow,
   const request = useRef<AbortController | null>(null), epoch = useRef(0), reportRef = useRef(report); reportRef.current = report;
   const connectedStudio = workflow.prompt[planId]?.class_type === 'MiniMaxH3ChainPlanStudio' && isLink(workflow.prompt[planId]?.inputs.plan);
   const editable = canEdit && !connectedStudio;
-  const assetLink = workflow.prompt[planId]?.inputs.project_assets;
-  const candidates = Object.entries(workflow.prompt).filter(([, node]) => node.class_type === 'MiniMaxH3ProjectAssetManager' && node.inputs.run_name === project);
-  const manager = isLink(assetLink) ? candidates.find(([id]) => id === assetLink[0])?.[0] : candidates.length === 1 ? candidates[0][0] : undefined;
+  const binding = resolvePlanBinding(workflow.prompt, planId);
+  const manager = binding.status === 'bound' && binding.project === project ? binding.managerId : undefined;
   const checkpointManager = Object.entries(workflow.prompt).find(([, node]) => node.class_type === 'MiniMaxH3ChainCheckpointManager')?.[0];
   const read = useCallback(async () => {
     request.current?.abort(); if (!connected || !project) return;

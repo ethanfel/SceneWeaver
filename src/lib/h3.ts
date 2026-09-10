@@ -1,8 +1,9 @@
 import type { Checkpoint, Plan, Prompt, Shot, Value } from '../types';
-import { isLink, parseJSON } from './workflow';
+import { parseJSON } from './workflow';
+import { planChoices, resolvePlanBinding } from '../../public/integrations/binding-core.mjs';
 export const promptText = (value: unknown): string => Array.isArray(value) ? value.join('\n') : String(value || '');
 export const checkpointFor = (checkpoints: Checkpoint[], shot: Shot | undefined, index: number) => checkpoints.find(c => c.scene === index + 1 && (!shot?.id || c.scene_id === shot.id));
-export const planNodes = (prompt: Prompt) => Object.entries(prompt).filter(([, node]) => ['MiniMaxH3ChainPlan', 'MiniMaxH3ChainPlanModern', 'MiniMaxH3ChainPlanStudio'].includes(node.class_type) && typeof node.inputs.plan_json === 'string');
+export const planNodes = (prompt: Prompt) => planChoices(prompt);
 export function readPlan(value: unknown): Plan {
   const plan = typeof value === 'string' ? parseJSON(value) : value;
   if (!plan || typeof plan !== 'object' || !Array.isArray((plan as Plan).shots) || (plan as Plan).shots.some(shot => !shot || typeof shot !== 'object' || Array.isArray(shot))) throw new Error('An H3 plan must contain a shots array of scene objects.');
@@ -29,10 +30,5 @@ export function planProblems(plan: Plan, inputs: Record<string, Value>): string[
   return problems;
 }
 export function effectiveRunName(prompt: Prompt, planId: string): string {
-  const node = prompt[planId];
-  if (!node) return '';
-  const assets = node.inputs.project_assets;
-  const owner = isLink(assets) ? prompt[assets[0]] : undefined;
-  const run = owner?.inputs.run_name ?? node.inputs.run_name;
-  return typeof run === 'string' ? run : '';
+  return resolvePlanBinding(prompt, planId).project;
 }
