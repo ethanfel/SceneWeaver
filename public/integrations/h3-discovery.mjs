@@ -1,6 +1,7 @@
 // Discover browser helpers independently: a broken optional module must not
 // hide working integrations. Source markers are reported as inference, never
 // as an installed pack version or proof that a backend route will succeed.
+import { PROMPT_SCHEMA_EXPORTS, PROMPT_COMPLETION_EXPORTS } from './prompt-tools.mjs';
 import { PLAN_AUTHORING_EXPORTS, PLAN_SETTINGS_EXPORTS } from './plan-authoring.mjs';
 
 export async function discoverH3(api, options = {}) {
@@ -69,6 +70,22 @@ export async function discoverH3(api, options = {}) {
       if (!functions(value, ['projectAudioTrackBindings'])) throw new Error(); adapters.audioTracks = value;
     });
   } else check('assets', 'unavailable', 'The H3 Asset Carousel extension could not be read.');
+  await probe('promptTools', 'Native prompt schema, section proposals, completions and rich token analysis available.', async () => {
+    const editor = await entry('h3_chain_scene_prompt_editor.js');
+    const rich = await module(editor, 'h3_rich_prompt_editor_core.mjs');
+    const richReference = editor.source.match(/["'](\.\/h3_rich_prompt_editor_core\.mjs(?:\?[^"']*)?)["']/)?.[1];
+    if (!richReference) throw new Error();
+    const richUrl = new URL(richReference, editor.url);
+    const schema = await module({ url: richUrl, source: await readText(richUrl.href) }, 'h3_prompt_schema_core.mjs');
+    const completion = await module(editor, 'h3_prompt_completion_core.mjs');
+    if (!functions(schema, PROMPT_SCHEMA_EXPORTS) || !Array.isArray(schema.H3_MODES) || !schema.H3_MODES.length || !functions(completion, PROMPT_COMPLETION_EXPORTS) || typeof rich.tokenizeRichPrompt !== 'function') throw new Error();
+    adapters.promptTools = { schema, completion, rich };
+    await probe('promptAliases', 'Native connected-project alias records available.', async () => {
+      const references = await module(editor, 'h3_reference_preview_core.mjs');
+      if (typeof references.projectAssetReferenceRecords !== 'function') throw new Error();
+      adapters.promptTools.references = references;
+    });
+  });
   if (studio.status === 'fulfilled') {
     await probe('planAuthoring', 'Native scene identity, duplication and chapter helpers available for local Plan drafts.', async () => {
       const value = await module(studio.value, 'h3_chain_plan_core.mjs');

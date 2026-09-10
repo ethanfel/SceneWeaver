@@ -1,3 +1,4 @@
+import { inspectPromptDraft } from './prompt-tools.mjs';
 import { PROTOCOL, validateEdits } from './bridge-core.mjs';
 import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
 
@@ -19,7 +20,7 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false, promptTools } = {}) {
   const editorialPreviews = new Map();
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
@@ -97,7 +98,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     let generationReason = '';
     try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
     const canSubmit = !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function';
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, promptToolsVersion: promptTools && typeof planAuthoring?.promptTextToLines === 'function' && typeof planAuthoring?.sharedPrompt === 'function' ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -185,11 +186,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
   }
   async function execute(command) {
       if (command.action === 'snapshot') return { snapshot: snapshot() };
-      if (command.action === 'plan-edit') {
+      if (command.action === 'plan-edit' || command.action === 'prompt-tools') {
         const current = assertCurrent(command), source = resolvePlanDocument(current.nodes, command.plan);
         if (source.status !== 'resolved' || !source.editable) throw new Error(source.reason || 'The Plan text source is read-only.');
         if (source.nodeId !== command.source_node || source.widget !== command.source_widget) throw new Error('The Plan draft belongs to a different text source. Refresh before editing.');
-        const data = editPlanDraft(planAuthoring, command.text, command.edit);
+        const data = command.action === 'prompt-tools' ? inspectPromptDraft(promptTools, planAuthoring, current.nodes, command.plan, command.text, command.request) : editPlanDraft(planAuthoring, command.text, command.edit);
         return { data, snapshot: snapshot() };
       }
       if (command.action === 'patch') {

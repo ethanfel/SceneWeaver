@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandReceipt, ComfyEvent, LiveResult, LiveSnapshot } from '../types';
 const PROTOCOL = 'sceneweaver.live.v1';
-const reads = new Set(['snapshot', 'export', 'focus', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview', 'command-status']);
+const reads = new Set(['snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview', 'command-status']);
 
 export function useLiveWorkflow(target: string, connected: boolean) {
   const [params] = useState(() => new URLSearchParams(location.hash.slice(1)));

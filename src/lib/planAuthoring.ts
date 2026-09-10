@@ -1,4 +1,5 @@
 export type PlanEdit =
+  | { type: 'scene-prompt'; index: number; value: string }
   | { type: 'scene-settings'; index: number; duration: { mode: 'default' | 'seconds' | 'frames'; value: string }; steps: string; seed: string; prompt_seed_mode: string; prompt_seed: string; randomize_seed?: 'generation' | 'prompt' }
   | { type: 'scene-seed-random'; index: number; kind: 'generation' | 'prompt' }
   | { type: 'plan-defaults'; index: number; duration_seconds: string; steps: string }

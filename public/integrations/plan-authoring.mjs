@@ -35,6 +35,11 @@ export function editPlanDraft(core, text, edit) {
   if (!Number.isInteger(selected) || selected < 0 || selected >= shots.length) throw new Error('The selected scene is outside the Plan draft.');
   if (settingsActions.has(edit.type) && PLAN_SETTINGS_EXPORTS.some(name => typeof core[name] !== 'function')) throw new Error('The installed H3 Plan settings helpers are unavailable.');
   switch (edit.type) {
+    case 'scene-prompt':
+      if (typeof edit.value !== 'string' || edit.value.length > 2_000_000) throw new Error('Enter prompt text of at most 2 million characters.');
+      if (typeof core.promptTextToLines !== 'function') throw new Error('The installed H3 prompt text normalizer is unavailable.');
+      shots[selected].prompt = core.promptTextToLines(edit.value);
+      break;
     case 'scene-settings': {
       const shot = shots[selected], duration = edit.duration;
       if (edit.randomize_seed !== undefined && !['generation', 'prompt'].includes(edit.randomize_seed)) throw new Error('Choose a generation or prompt seed.');

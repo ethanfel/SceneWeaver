@@ -98,8 +98,8 @@ Design rules:
 | E01 | Add/remove/duplicate/reorder scenes and chapters; canonical IDs, inherited settings and accepted legacy Plan forms | 0.5.8 native scene actions; 0.5.9 inheritance and chapter-boundary controls. Production parity still requires validation | Edit / M2 |
 | E02 | Shared direction, scene prompts, raw/delivered duration, default precedence, seeds, steps, canvas and chapter resolution | 0.5.9 authored settings and raw-frame previews; native planned delivered timing and lock-aware effective resolution remain partial | Edit Inspector / M2 |
 | E03 | Connected LoRA routes Base/A–Z, clear inheritance and missing-route diagnostics; preserve lazy model execution | Generic controls | Edit + Generate / M3 |
-| E04 | Native mode-aware prompt schema, sections, validation/repair, completions, aliases, dialogue/speaker tokens and rich/plain views | Textarea + JSON | Expanded prompt editor / M2 |
-| E05 | Prompt history list/diff/restore/fork, original/effective/ALT prompt comparison, scene-local undo, import/export | Browser draft backup only | Edit history / M2, M4 |
+| E04 | Native mode-aware prompt schema, sections, validation/repair, completions, aliases, dialogue/speaker tokens and rich/plain views | 0.5.10 native schema/structure proposals, completions, plain/highlighted views and connected-project aliases. Scheduled/native reference bindings, reference refactoring and full rich editing remain partial | Expanded prompt editor / M2 |
+| E05 | Prompt history list/diff/restore/fork, original/effective/ALT prompt comparison, scene-local undo, import/export | 0.5.10 prompt-local undo and proposal comparison; saved native history, fork/restore and import/export remain open | Edit history / M2, M4 |
 | E06 | Optional native Prompt Optimizer configuration, result diff, explicit apply, failures and cancellation | New | Edit Assistant drawer / M2 |
 
 ### Generation, execution and review

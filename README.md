@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.9** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.10** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -70,6 +70,10 @@ In **0.5.2**, scene editing follows the Plan's effective text source. Supported 
 In **0.5.3**, **Branches** opens the native branch manager: save authoring, save and switch, open saved settings while retaining native recovery drafts, create an empty branch or fork through the selected scene, reload, recover, retry a pending operation, and change the project default. These actions require the H3 browser interface proposed in [H3 PR #57](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/57), currently on `sceneweaver-branch-controls`. Existing main/nightly installations keep branch following and show why commands are unavailable. The interface must be installed and the ComfyUI tab refreshed; a SceneWeaver update alone cannot add it.
 
 ## September 2026 H3 compatibility update
+
+In **0.5.10**, **Edit → Prompt** opens the expanded prompt workspace. It uses the installed H3 helpers for schema checks, section navigation, proposed missing structure/keyframe alignment, highlighted tokens and completions at the cursor (`Ctrl+Space` for manual suggestions). Project aliases come from the Carousel explicitly connected to the selected Plan; scheduled and separately wired native references are not yet checked. Schema selection does not change the workflow's generation mode.
+
+Review **Before / Proposed**, choose **Use proposed text**, then **Stage prompt** to add it to the recoverable Plan draft. **Apply to ComfyUI** updates the original Plan text source. Prompt undo/redo and unstaged text survive scene/page navigation within this workspace; unstaged text is not a saved revision or a reload/reattachment backup. Conflicting Inspector edits require an explicit reload of the scene draft. Missing H3 prompt helpers leave the existing basic Inspector available. Refresh ComfyUI and reopen SceneWeaver after updating.
 
 In **0.5.8**, attached scene structure edits use the installed H3 Plan helpers: add, duplicate, rename, move and remove scenes, and add, edit or remove chapter markers. Rename updates chapter starts and ID-based context references; duplicate uses native continuation remapping and exact seed handling. Results stay in the current draft until **Apply to ComfyUI**. Bare scene lists, prompt-string scenes and top-level duration/steps shorthand can be displayed without rewriting the source. Refresh the ComfyUI tab and reopen SceneWeaver after updating.
 
