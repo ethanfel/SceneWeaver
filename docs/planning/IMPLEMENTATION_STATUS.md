@@ -4,6 +4,18 @@ Active goal: implement [the complete roadmap](../WORKFLOW_PARITY_PLAN.md), prese
 
 Release convention requested by the user: continue the current work as **0.5.1, 0.5.2, ...**. Do not increment the minor version for each implementation batch.
 
+## 0.5.8: native scene and chapter draft edits
+
+- The attached ComfyUI browser discovers the installed `h3_chain_plan_core.mjs` exports independently of ownership, checkpoint and editorial helpers. Structural controls show unavailable when that contract is absent; ordinary prompt drafting remains available.
+- Add, duplicate, rename, move and remove call the native helpers against the exact current draft. Native duplication pins implicit IDs and remaps positional and predecessor context references. Rename updates ID-based visual/audio references, context blocks and chapter starts. Native scene deletion handles affected chapter boundaries; at least one scene is retained.
+- The Scene Inspector offers explicit rename, chapter creation before the selected scene, title/notes editing and marker removal. Results are staged in the existing source-aware draft pipeline, including shared-input review and recovery. A changed draft, selection, binding or revision invalidates a late transformation result. Unsubmitted rename/chapter fields reset when attaching another workflow, project, branch or Plan.
+- Bare scene lists, prompt-string scenes and top-level duration/steps shorthand have a display projection that preserves the source text until edited. Structural edits use native parsing/serialization, including its canonical chapter normalization and exact uint64 seed handling.
+- The command is read-only with respect to ComfyUI and H3 storage. Applying a draft remains separate from workflow-file saving, branch saving, checkpoint restoration and saved-cut edits. Renaming/reordering authoring does not migrate saved checkpoint identity or saved editorial. Move/remove follow native helper behavior; they do not promise to repair arbitrary continuation links. Review those links before generation.
+
+This is partial E01/E02 progress, not M2 completion. Chapter resolution/reordering, full default/inheritance controls, raw versus delivered timing authoring, rich prompt tools and history remain open. Imported local workflows retain their basic editor; this native integration targets attached workflows. Browser validation uses the real native pure helper with a synthetic ComfyUI adapter, not production GPU execution.
+
+Validation: the 0.5.8 production build passed; 35 frontend and 106 adapter/proxy tests passed. All 90 browser regression cases passed. After the final canonical-ID and workflow-field-reset corrections, the five native authoring adapter cases and all eight authoring browser cases passed (91 distinct browser cases overall). The 1280×720 Inspector screenshot was visually inspected. The native Plan fixture was verified byte-for-byte against H3 nightly `326453d71065f8031c160ea4d504678dab3e0cc1`. No production project writes or GPU execution were performed.
+
 ## M0: in progress
 
 Implemented in the first integration batch, SceneWeaver 0.5.0:

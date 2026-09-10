@@ -1,11 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { discoverH3 } from '../public/integrations/h3-discovery.mjs';
+import * as planCore from '../e2e/fixtures/h3-native/h3_chain_plan_core.mjs';
 
 const origin = 'http://comfy.test';
 const assetPath = '/extensions/h3/h3_project_asset_manager.js';
 const studioPath = '/extensions/h3/h3_chain_plan_studio.js';
 const imports = `import './h3_project_ownership.mjs?v=not-a-release'; import './h3_project_asset_editor_core.mjs'; import './h3_project_asset_sync_core.mjs';`;
+test('scene authoring requires native function and limit exports independently of project writes', async () => {
+  const env = environment({ sources: { [studioPath]: `import './h3_chain_plan_core.mjs?v=installed';` }, exports: planCore });
+  const supported = await discoverH3(env.api, env.options);
+  assert.equal(supported.planAuthoring.renamePlanShot, planCore.renamePlanShot);
+  assert.equal(supported.diagnostics.checks.find(item => item.id === 'planAuthoring').status, 'available');
+  const importModule = env.options.importModule;
+  env.options.importModule = async url => ({ ...await importModule(url), duplicateShot: undefined });
+  const missing = await discoverH3(env.api, env.options);
+  assert.equal(missing.planAuthoring, undefined); assert.equal(typeof missing.ownershipOptions, 'function');
+});
 function environment(overrides = {}) {
   const sources = { [assetPath]: imports, [studioPath]: `import './h3_working_branches.mjs'; working_branch_id; base_revision: '/minimax_h3_context_loop/editorial'`, ...overrides.sources };
   const calls = [];

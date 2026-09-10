@@ -75,3 +75,7 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 @media(max-width:1050px){.production-fields{grid-template-columns:minmax(0,1fr)}}
 
 .saved-cut-inspector h3{font-size:12px;word-break:break-word;margin:16px 0 8px}.saved-cut-inspector .scene-actions{flex-wrap:wrap}.saved-cut-inspector select{width:100%;min-width:0}.cut-lock{display:flex;align-items:center;gap:8px;font-size:11px;margin:12px 0}.cut-captions{border:0;padding:0;margin:12px 0 0}
+
+.chapter-marker { margin: 14px 0; }
+.chapter-marker summary { font-size: 11px; color: #b8c1cc; overflow-wrap: anywhere; padding: 8px 0; }
+.chapter-marker .scene-actions { flex-wrap: wrap; margin-top: 8px; }

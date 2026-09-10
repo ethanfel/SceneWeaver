@@ -1,6 +1,8 @@
 // Discover browser helpers independently: a broken optional module must not
 // hide working integrations. Source markers are reported as inference, never
 // as an installed pack version or proof that a backend route will succeed.
+import { PLAN_AUTHORING_EXPORTS } from './plan-authoring.mjs';
+
 export async function discoverH3(api, options = {}) {
   const origin = new URL(options.baseUrl || location.href);
   const readText = options.readText || (async url => { const response = await fetch(url); if (!response.ok) throw new Error('Extension fetch failed.'); return response.text(); });
@@ -68,6 +70,11 @@ export async function discoverH3(api, options = {}) {
     });
   } else check('assets', 'unavailable', 'The H3 Asset Carousel extension could not be read.');
   if (studio.status === 'fulfilled') {
+    await probe('planAuthoring', 'Native scene identity, duplication and chapter helpers available for local Plan drafts.', async () => {
+      const value = await module(studio.value, 'h3_chain_plan_core.mjs');
+      if (!functions(value, PLAN_AUTHORING_EXPORTS) || !Number.isInteger(value.MAX_SHOTS) || value.MAX_SHOTS < 1 || !Number.isInteger(value.MAX_CHAPTERS) || value.MAX_CHAPTERS < 1) throw new Error();
+      adapters.planAuthoring = value;
+    });
     await probe('editorial', 'Native saved-sequence inspection, edit previews and conditional saves available.', async () => {
       const value = await module(studio.value, 'h3_editorial_commands.mjs');
       if (value.EDITORIAL_COMMAND_VERSION !== 1 || !functions(value, ['editorialCommand'])) throw new Error();

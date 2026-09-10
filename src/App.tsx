@@ -42,6 +42,7 @@ import type { WorkspacePage } from './lib/workspace';
 import { Music2, WandSparkles, SlidersHorizontal, PanelLeft, PanelRight, Columns2 } from 'lucide-react';
 
 import { version } from '../package.json';
+import type { PlanEdit } from './lib/planAuthoring';
 
 const STORAGE = 'sceneweaver.project.v1';
 const empty: Workflow = { name: 'Untitled project', prompt: {}, bindings: {}, warnings: [] };
@@ -133,6 +134,26 @@ export default function App() {
     if (planDocument.status !== 'resolved' || planDocument.editable === false) { report(planDocument.reason || 'The Plan text source is read-only.'); return; }
     updateInput(planDocument.nodeId, planDocument.widget, JSON.stringify(next, null, 2));
   };
+  const [authoringBusy, setAuthoringBusy] = useState(false);
+  const authoringPending = useRef(false);
+  const authoringContext = JSON.stringify([server.target, baseline?.binding, baseline?.revision, live.snapshot?.binding, live.snapshot?.revision, canWriteLive, planId, selected, planDocument]);
+  const authoringContextRef = useRef(authoringContext); authoringContextRef.current = authoringContext;
+  const canAuthorPlan = canWriteLive && baseline?.capabilities?.planAuthoringVersion === 1 && !authoringBusy;
+  const editPlan = async (edit: PlanEdit) => {
+    if (!canAuthorPlan || authoringPending.current || planDocument.status !== 'resolved') { report('Native Plan editing needs an attached, current ComfyUI tab with H3 authoring helpers.'); return; }
+    authoringPending.current = true; setAuthoringBusy(true);
+    try {
+      const result = await live.command('plan-edit', { plan: planId, source_node: planDocument.nodeId, source_widget: planDocument.widget, text: planDocument.text, edit }, baseline);
+      if (authoringContextRef.current !== authoringContext) throw new Error('The Plan draft or selection changed while preparing the edit. Your newer draft was kept; select the scene and try again.');
+      const data = result.data as { text?: unknown; selected?: unknown } | undefined;
+      if (typeof data?.text !== 'string' || !Number.isInteger(data?.selected)) throw new Error('H3 returned an invalid Plan draft.');
+      readPlan(data.text);
+      updateInput(planDocument.nodeId, planDocument.widget, data.text);
+      select(data.selected as number);
+      notify('Plan edit staged. Apply to ComfyUI when ready.');
+    } catch (error) { report(String(error)); }
+    finally { authoringPending.current = false; setAuthoringBusy(false); }
+  };
   const applyDecision = (review: Review, result: ReviewResult) => {
     if (live.requested) { void live.command('snapshot').catch(e => report(String(e))); return; }
     if (result.seed === undefined || result.scene_prompt === undefined) return;
@@ -148,7 +169,7 @@ export default function App() {
     });
     setSaved(false);
   };
-  const addScene = () => { if (plan) { updatePlan({ ...plan, shots: [...plan.shots, { id: `scene_${crypto.randomUUID().slice(0, 6)}`, prompt: '' }] }); select(plan.shots.length); } };
+  const addScene = () => { if (live.requested) { void editPlan({ type: 'add', index: selected }); return; } if (plan) { updatePlan({ ...plan, shots: [...plan.shots, { id: `scene_${crypto.randomUUID().slice(0, 6)}`, prompt: '' }] }); select(plan.shots.length); } };
   const showPreview = (url: string, name: string, details: Partial<PreviewMedia> = {}) => { setSourcePreview({ url, name, ...details }); if (page === 'generate') { setPage('edit'); setEditTab('viewer'); } workspace.change({ dual: true }); };
   const saveProject = useCallback(() => {
     if (live.requested) {
@@ -277,7 +298,7 @@ export default function App() {
       <aside className="media-bin panel" hidden={!workspace.fitted.bin}><div className="panel-title"><span>Media pool</span><button className="icon-button" onClick={() => setModal('runs')} disabled={!server.connected} aria-label="Browse saved runs"><FolderOpen size={15}/></button></div>
         <div className="bin-tabs"><button className={bin === 'scenes' ? 'active' : ''} onClick={() => setBin('scenes')}>Scenes <span>{plan?.shots.length || 0}</span></button><button className={bin === 'media' ? 'active' : ''} onClick={() => setBin('media')}>Media <span>{fileList.length + sessionMedia.length}</span></button></div>
         <label className="search"><Search size={13}/><input aria-label="Search media pool" placeholder={bin === 'scenes' ? 'Find a scene…' : 'Find media…'} value={search} onChange={e => setSearch(e.target.value)}/></label>
-        <div className="bin-section-label"><span>{bin === 'scenes' ? 'SCENE PLAN' : 'RENDERS & REFERENCES'}</span>{bin === 'scenes' && <button className="icon-button" disabled={!plan || planDocument.editable === false || !sourceBridgeReady} onClick={addScene} aria-label="New scene"><Plus size={14}/></button>}</div>
+        <div className="bin-section-label"><span>{bin === 'scenes' ? 'SCENE PLAN' : 'RENDERS & REFERENCES'}</span>{bin === 'scenes' && <button className="icon-button" disabled={!plan || planDocument.editable === false || !sourceBridgeReady || live.requested && !canAuthorPlan} onClick={addScene} aria-label="New scene"><Plus size={14}/></button>}</div>
         <div className="bin-content">{bin === 'scenes' ? <>
           {plans.length > 1 && <select aria-label="Active H3 plan" value={planId} onChange={e => { setSelectedPlan(e.target.value); select(0); }}><option value="" disabled>Choose the production Plan…</option>{plans.map(([id, node]) => <option key={id} value={id}>{nodeTitle(id, node)}</option>)}</select>}
           {plan?.shots.map((shot, index) => !`${shot.id} ${promptText(shot.prompt)}`.toLowerCase().includes(search.toLowerCase()) ? null : <button key={index} className={`scene-card ${selected === index ? 'selected' : ''}`} onClick={() => { select(index); setInspectorTab('scene'); setPage('edit'); }}><div className={`scene-art tone-${index % 4}`}><span className="scene-number">{String(index + 1).padStart(2, '0')}</span><Clapperboard size={32} strokeWidth={1}/><CheckpointThumbnail url={checkpointThumbnailUrl(runName, checkpointFor(server.checkpoints, shot, index), server.target)} name={shot.id || `Scene ${index + 1}`}/><span className="scene-duration">{(rawFrames(shot, plan, planNode.inputs) / 24).toFixed(2)}s raw</span></div><div className="scene-card-info"><strong>{shot.id?.replaceAll('_', ' ') || 'Untitled scene'}</strong><span><i className={`status-dot ${checkpointFor(server.checkpoints, shot, index)?.ready ? 'green' : ''}`}/>{checkpointFor(server.checkpoints, shot, index)?.ready ? 'Rendered' : 'Not rendered'}</span></div></button>)}
@@ -315,7 +336,7 @@ export default function App() {
         </div>
       </section>
       {workspace.fitted.inspector && <ResizeHandle label="Resize inspector" value={workspace.fitted.right} min={240} max={Math.max(240, Math.min(520, workspace.size.width - (workspace.fitted.bin ? workspace.fitted.left + 6 : 0) - 12 - (workspace.layout.dual ? 560 : 360)))} reverse change={right => workspace.change({ right })} reset={() => workspace.change({ right: 302 })}/>}
-      <div className="inspector-pane" hidden={!workspace.fitted.inspector}><Inspector savedCut={<SavedCutInspector key={`${server.target}:${baseline?.binding || ''}:${planId}:${runName}:${branchId}`} snapshot={live.snapshot?.binding === baseline?.binding ? live.snapshot : baseline} planId={planId} project={runName} branchId={branchId} scene={selected + 1} sceneId={activeShot?.id || ''} active={inspectorTab === 'cut' && workspace.fitted.inspector && !workflowOpen} editable={canWriteLive && !draftEdits.length} idle={!server.queue.queue_running.length && !server.queue.queue_pending.length} savedVersion={server.editorial?.revision || ''} command={(action, options) => live.command(action, options, baseline)} changed={server.refreshCheckpoints}/>} workflow={workflow} sourceBridgeReady={sourceBridgeReady} schemas={schemas} plan={plan} planId={planId} selected={selected} nodeId={selectedNode || planId} tab={inspectorTab} setTab={setInspectorTab} updateInput={updateInput} updatePlan={updatePlan} select={select} selectNode={selectNode} editJson={() => setModal('plan-json')} report={report} connected={server.connected}/></div>
+      <div className="inspector-pane" hidden={!workspace.fitted.inspector}><Inspector key={`${server.target}:${baseline?.binding || ""}:${planId}:${runName}:${branchId}`} nativeEditing={live.requested} canAuthorPlan={canAuthorPlan} editPlan={edit => void editPlan(edit)} savedCut={<SavedCutInspector key={`${server.target}:${baseline?.binding || ''}:${planId}:${runName}:${branchId}`} snapshot={live.snapshot?.binding === baseline?.binding ? live.snapshot : baseline} planId={planId} project={runName} branchId={branchId} scene={selected + 1} sceneId={activeShot?.id || ''} active={inspectorTab === 'cut' && workspace.fitted.inspector && !workflowOpen} editable={canWriteLive && !draftEdits.length} idle={!server.queue.queue_running.length && !server.queue.queue_pending.length} savedVersion={server.editorial?.revision || ''} command={(action, options) => live.command(action, options, baseline)} changed={server.refreshCheckpoints}/>} workflow={workflow} sourceBridgeReady={sourceBridgeReady} schemas={schemas} plan={plan} planId={planId} selected={selected} nodeId={selectedNode || planId} tab={inspectorTab} setTab={setInspectorTab} updateInput={updateInput} updatePlan={updatePlan} select={select} selectNode={selectNode} editJson={() => setModal('plan-json')} report={report} connected={server.connected}/></div>
     </main>
     <ResizeHandle label="Resize timeline" value={workspace.fitted.timeline} min={140} max={Math.max(140, workspace.size.height - 270)} horizontal reverse change={timeline => workspace.change({ timeline })} reset={() => workspace.change({ timeline: 224 })}/>
     <Timeline project={runName} server={server.target} plan={plan} inputs={planNode?.inputs || {}} checkpoints={server.checkpoints} editorial={server.editorial} selected={selected} select={select} add={addScene} currentTime={currentTime} onSeek={seconds => { setPage('edit'); setEditTab('viewer'); setPendingTimelineSeek(seconds); }}/></div>

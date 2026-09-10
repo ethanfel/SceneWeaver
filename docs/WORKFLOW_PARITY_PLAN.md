@@ -95,7 +95,7 @@ Design rules:
 | A07 | Source timeline versus standalone clip windows, offsets, fit, sampling/FPS; lazy source loading and per-scene source preview | Saved soundtrack preview only | Media source viewer / M2 |
 | A08 | Legacy scene schedules, alias/native-label resolution, strict/soft/disabled compilation and capacity diagnostics | New | Edit References / M2 |
 | A09 | Semantic picture anchors, scene-local anchor times, storyboard/presentation mode and size; distinguish Qwen-only from native VAE references | New | Edit References / M2 |
-| E01 | Add/remove/duplicate/reorder scenes and chapters; canonical IDs, inherited settings and accepted legacy Plan forms | Basic scene editor, rejects some valid shorthand | Edit / M2 |
+| E01 | Add/remove/duplicate/reorder scenes and chapters; canonical IDs, inherited settings and accepted legacy Plan forms | 0.5.8 native scene actions and chapter markers; shorthand display. Full inherited settings and chapter ordering remain partial | Edit / M2 |
 | E02 | Shared direction, scene prompts, raw/delivered duration, default precedence, seeds, steps, canvas and chapter resolution | Partial | Edit Inspector / M2 |
 | E03 | Connected LoRA routes Base/A–Z, clear inheritance and missing-route diagnostics; preserve lazy model execution | Generic controls | Edit + Generate / M3 |
 | E04 | Native mode-aware prompt schema, sections, validation/repair, completions, aliases, dialogue/speaker tokens and rich/plain views | Textarea + JSON | Expanded prompt editor / M2 |

@@ -5,9 +5,17 @@ export const promptText = (value: unknown): string => Array.isArray(value) ? val
 export const checkpointFor = (checkpoints: Checkpoint[], shot: Shot | undefined, index: number) => checkpoints.find(c => c.scene === index + 1 && (!shot?.id || c.scene_id === shot.id));
 export const planNodes = (prompt: Prompt) => planChoices(prompt);
 export function readPlan(value: unknown): Plan {
-  const plan = typeof value === 'string' ? parseJSON(value) : value;
-  if (!plan || typeof plan !== 'object' || !Array.isArray((plan as Plan).shots) || (plan as Plan).shots.some(shot => !shot || typeof shot !== 'object' || Array.isArray(shot))) throw new Error('An H3 plan must contain a shots array of scene objects.');
-  return plan as Plan;
+  const raw = typeof value === 'string' ? parseJSON(value) : value;
+  const plan = (Array.isArray(raw) ? { shots: raw } : raw) as Plan | null;
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.shots) || plan.shots.some(shot => typeof shot !== 'string' && (!shot || typeof shot !== 'object' || Array.isArray(shot)))) throw new Error('An H3 plan must contain a shots array of scene objects or prompt strings.');
+  // Display the accepted shorthand without touching its original text source.
+  // Native structural edits parse and serialize that exact source in ComfyUI.
+  const view: Plan = { ...plan, shots: plan.shots.map(shot => typeof shot === 'string' ? { prompt: shot } : shot) };
+  if (Object.hasOwn(plan, 'duration_seconds') || Object.hasOwn(plan, 'steps')) {
+    view.defaults = { ...(Object.hasOwn(plan, 'duration_seconds') ? { duration_seconds: plan.duration_seconds } : {}), ...(Object.hasOwn(plan, 'steps') ? { steps: plan.steps } : {}), ...plan.defaults };
+    delete view.duration_seconds; delete view.steps;
+  }
+  return view;
 }
 export const h3Frames = (seconds: number) => Math.max(5, Math.ceil((seconds * 24 - 5) / 17) * 17 + 5);
 export const rawFrames = (shot: Shot, plan: Plan, inputs: Record<string, Value>) => Number(shot.length ?? shot.frames ?? (shot.duration_seconds !== undefined ? h3Frames(Number(shot.duration_seconds)) : plan.defaults?.length ?? plan.defaults?.frames ?? h3Frames(Number(plan.defaults?.duration_seconds ?? inputs.default_duration_seconds ?? 15))));
