@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { CommandReceipt } from '../types';
 
-const labels: Record<string, string> = { 'generate-range': 'Generate scenes', 'branch-command': 'Working branch', patch: 'Apply draft', queue: 'Queue workflow', 'workflow-save': 'Save workflow', 'take-final-cut': 'Choose final cut', 'checkpoint-activate': 'Restore checkpoint', 'asset-update': 'Edit asset', 'asset-upload': 'Upload asset', 'asset-import': 'Import asset', 'asset-audio-tracks': 'Apply audio tracks' };
+const labels: Record<string, string> = { deliver: 'Assemble saved selection', 'generate-range': 'Generate scenes', 'branch-command': 'Working branch', patch: 'Apply draft', queue: 'Queue workflow', 'workflow-save': 'Save workflow', 'take-final-cut': 'Choose final cut', 'checkpoint-activate': 'Restore checkpoint', 'asset-update': 'Edit asset', 'asset-upload': 'Upload asset', 'asset-import': 'Import asset', 'asset-audio-tracks': 'Apply audio tracks' };
 const statuses: Record<CommandReceipt['status'], string> = { pending: 'Sent', running: 'In progress', succeeded: 'Completed', rejected: 'Rejected', partial: 'Needs review', uncertain: 'Result unknown' };
 
 export function CommandHistory({ receipts, binding, connected, check, refresh }: { receipts: CommandReceipt[]; binding: string; connected: boolean; check: (id: string) => Promise<unknown>; refresh: () => Promise<unknown> }) {

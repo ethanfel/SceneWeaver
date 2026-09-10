@@ -90,5 +90,10 @@ export async function discoverH3(api, options = {}) {
     };
   });
   else check('checkpoints', 'unavailable', 'Checkpoint Manager extension missing, duplicated, or unreadable in this H3 pack.');
+  if (manager.status === 'fulfilled') await probe('delivery', 'Native saved-delivery snapshot and isolated assembly recipe available. Preparation verifies the backend contract and exact saved sources.', async () => {
+    const [native, core] = await Promise.all([module(manager.value, 'h3_delivery_core.mjs'), module(manager.value, 'h3_checkpoint_manager_core.mjs')]);
+    if (native.DELIVERY_VERSION !== 1 || !functions(native, ['prepareDelivery', 'deliveryPrompt']) || !functions(core, ['checkpointLocalSelectionJson'])) throw new Error();
+    adapters.delivery = { ...native, checkpointLocalSelectionJson: core.checkpointLocalSelectionJson };
+  });
   return adapters;
 }

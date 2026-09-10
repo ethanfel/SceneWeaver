@@ -1,5 +1,6 @@
 import { resolvePlanBinding } from './binding-core.mjs';
 import { needsPlanSourceAdapter, planBranchSource, resolvePlanDocument } from './plan-source.mjs';
+import { deliveryTargets } from './delivery-core.mjs';
 import { generationProposal, generationTargets } from './production-range.mjs';
 
 // Availability means the companion has a command adapter, not that permission,
@@ -42,7 +43,7 @@ export function planTaskCapabilities(snapshot, planId) {
     }
   }
   task('generate-range', 'Generate selected scene / range', generationReady, generationReady ? 'Uses native serialization and queue hooks for the selected assembly dependency path. Connected range controls, ALT drafts and subgraphs need dedicated adapters. Top-level continuation supports one scene only.' : !managed ? managedReason : generationReason);
-  task('deliver', 'Run an isolated delivery', false, 'Assembly nodes can be inspected. Queuing the whole workflow is not an isolated delivery command.');
+  task('deliver', 'Assemble saved selection', managed && caps.deliveryVersion === 1 && deliveryTargets(nodes).length > 0, caps.deliveryVersion === 1 ? 'Freezes an exact saved lineage, final-cut pictures and captions, then queues the native isolated assembly recipe. Backend preparation validates source availability; unsupported ancillary input branches need their own adapters.' : 'The native H3 saved-delivery snapshot interface is required. Existing output previews remain available.');
   task('finish', 'Run finishing recipe', false, 'Requires exact saved-source selection and a native processing recipe adapter.');
   return { version: 1, planId, tasks };
 }

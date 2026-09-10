@@ -53,3 +53,9 @@ declare module '*production-range.mjs' {
   export function generationTargets(nodes: LiveSnapshot['nodes'], planId: string): Target[];
   export function generationProposal(snapshot: LiveSnapshot, options: Record<string, unknown>): { target: Target; sceneIds: string[]; reviews: { id: string }[] };
 }
+
+declare module '*delivery-core.mjs' {
+  type LiveSnapshot = import('./types').LiveSnapshot;
+  export function deliveryTargets(nodes: LiveSnapshot['nodes']): { id: string; title: string }[];
+  export function deliveryConfiguration(snapshot: LiveSnapshot, options: Record<string, unknown>): { target: string; manager: string; settings: Record<string, unknown> };
+}

@@ -1,4 +1,4 @@
-const reads = new Set(['snapshot', 'export', 'focus', 'checkpoint-preview']);
+const reads = new Set(['snapshot', 'export', 'focus', 'checkpoint-preview', 'delivery-preview']);
 
 // Receipts live in the parent tab, so a companion refresh can recover the
 // outcome without replaying a mutation. They are not durable H3 job records.

@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.5** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.6** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -19,13 +19,25 @@ The bottom navigation now has six production pages. **Workflow** in the top tool
 | Generate | Selected scene/range submission on supported native loops, job receipts and PreviewRelay monitor; live review in the render queue |
 | Finish | Saved original and processed take inventories, source preview and downloads |
 | Audio | Soundtrack assets, full mix/vocal/instrumental bindings and caption text |
-| Deliver | Existing saved outputs, previews and downloads |
+| Deliver | Review and assemble a frozen saved selection when H3's delivery interface is installed; existing output previews and downloads |
 
 Drag the dividers to resize the media pool, inspector, source viewer and timeline. Focus a divider and use arrow keys for keyboard resizing; double-click it to reset that divider. The viewer toolbar toggles panels and resets the current page's layout. Page layouts are saved in this browser, and narrow windows temporarily hide side panels to leave room for the viewers.
 
 **Source** previews an asset, saved take or processing output independently of the saved sequence. Each viewer has its own position and playback controls. Starting one monitor pauses the other; page changes pause hidden playback. The sequence keeps its position across pages. Asset field drafts and take comparisons survive page navigation during this session; they are not persisted by workspace preferences. Source selection clears when the server, attached workflow, Plan, project or working branch changes.
 
-These pages organize the existing companion tools. Finishing jobs, advanced generation scopes, assembly of saved selections and new export commands and full editorial/audio editing still require the remaining roadmap adapters; a new page is not a parity claim.
+These pages organize the existing companion tools. Finishing jobs, advanced generation scopes, chapter/processed-source delivery, new export commands and full editorial/audio editing still require the remaining roadmap adapters; a new page is not a parity claim.
+
+## Saved delivery (0.5.6)
+
+This feature requires the native H3 interface proposed in **[H3 PR #58](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/58)**, currently a draft. It is not included in the audited nightly `326453d`; updating SceneWeaver alone does not enable it. Existing output previews and downloads continue to work. Refresh ComfyUI and reopen SceneWeaver after installing a compatible H3 update.
+
+On **Deliver**, choose the assembly node whose settings you want to use, the saved sequence endpoint, filename and final audio source. **Review saved delivery** captures the exact generated lineage, current branch's cut, picture alternates and subtitle cues. Review the summary, then choose **Assemble now**. Later saved-cut or lyric edits do not change that prepared source. Missing or changed media stops assembly. Preparation does not restore a Plan or activate checkpoints.
+
+The native assembly recipe retains blend, bitrate, color and output-copy settings, with its supported connected VAE/audio readers. It excludes scene generation and leaves the live graph wired as before. Unknown ancillary producers, connected scalar settings, subgraphs and overwrite mode require further adapters. Source hashing can take time. The UI currently selects a prefix from the branch's active saved endpoints; chapter selection, processed sources and independent final-cut branch selection remain future work.
+
+Accepted ComfyUI job IDs remain in **Actions** after a lost result or companion reload while the parent tab stays open. Native H3 writes a `.delivery.json` record beside the project video, preserving source JSON and scalar settings. Connected audio/VAE dependencies remain in native workflow metadata/history; the record is not a self-contained media archive. Grouped record downloads and recovery across a parent-tab restart still need dedicated controls.
+
+Validation includes native H3 assembly of temporary synthetic media with real FFmpeg audio/video and captions, plus browser/adapter regression tests. Production GPU execution and the complete generation-to-delivery cycle remain unverified.
 
 ## Scene generation (0.5.5)
 

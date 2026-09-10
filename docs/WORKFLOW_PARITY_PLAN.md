@@ -146,7 +146,7 @@ Design rules:
 | F03 | Recover reference conditioning, cache validation/rebuilds, semantic presentation overrides and preserved generated/source audio | New | Finish Inspector / M6 |
 | F04 | Scene-level processing progress/checkpoints, cancelled partials, skip/resume validation, per-profile dependencies and output selection | Reads saved processing records | Finish / M6 |
 | F05 | Before/after and seam evaluation; native assembly color stabilization separately from generation conditioning | Basic independent take comparison | Finish / M5–M6 |
-| D01 | Assemble whole branch, selected contiguous prefix or sealed chapter; select exact manifest and final-cut picture source | Graph queue only | Deliver / M1 minimal, M7 complete |
+| D01 | Assemble whole branch, selected contiguous prefix or sealed chapter; select exact manifest and final-cut picture source | 0.5.6: frozen prefix assembly requires H3 PR #58; chapter/processed UI and native production trial pending | Deliver / M1 minimal, M7 complete |
 | D02 | Native filename/date tokens, bitrate, source/generated audio, output-copy settings, blend schedules and optional assembly color stabilization | Generic settings | Deliver Inspector / M7 |
 | D03 | Lossless PNG and/or WAV re-decode with independently optional VAEs, frame counts, trims, exact ordering and resumable chapter appends | New | Deliver / M7 |
 | D04 | Scene-by-scene VIDEO-to-PNG passthrough, immutable export variants and recovery of interrupted publication | New | Deliver / M7 |

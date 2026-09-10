@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'node:http';
 import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { createApp } from '../server/app.mjs';
 const app = express(); app.use(express.json({ limit: '30mb' }));
@@ -49,6 +49,15 @@ app.post('/minimax_h3_context_loop/review', (req, res) => { decisions.push(req.b
 app.post('/test/review', (_req, res) => {
   reviews = [{ token: 'review-test', run_name: 'sceneweaver_first_film', clip_index: 1, clip_count: 3, shot_id: 'the_arrival', scene_prompt: 'Original', seed: '18446744073709551615', raw_frames: 124, candidate_count: 2, candidates: [{ number: 1, revision: 'take-1', seed: '1' }, { number: 2, revision: 'take-2', seed: '2' }] }];
   broadcast('minimax_h3_context_loop_review', reviews[0]); res.json({});
+});
+app.post('/minimax_h3_context_loop/delivery/prepare', (req, res) => {
+  const { selection, editorial_revision } = req.body;
+  const data = selection?._branch_id === '1'.repeat(32) ? branchData : takeData;
+  if (!data || data.editorial.revision !== editorial_revision) return res.status(409).json({ error: 'The final cut changed.' });
+  const manifest = { run_name: selection.run_name, _branch_id: selection._branch_id, editorial: data.editorial, segments: selection.lineage };
+  const snapshot = { format: 'h3_delivery_snapshot_v1', version: 1, manifest, selection };
+  const snapshot_id = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+  res.json({ version: 1, snapshot_id, snapshot_json: JSON.stringify({ ...snapshot, id: snapshot_id }), summary: { run_name: selection.run_name, branch_id: selection._branch_id, final_cut_branch_id: selection.final_cut_branch_id, editorial_revision, scene_start: 1, scene_end: selection.lineage.at(-1).scene, frames: 240, fps: 24, subtitle_count: 2, pictures: selection.lineage.map(item => ({ scene: item.scene, scene_id: `scene_${item.scene}`, revision: data.editorial.replacements.find(row => row.scene === item.scene && row.base_revision === item.revision)?.alternate_revision || item.revision })) } });
 });
 app.get('/test/state', (_req, res) => res.json({ submissions, decisions, takeActions }));
 app.get('/scripts/app.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-app.mjs')));

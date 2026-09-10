@@ -5,7 +5,7 @@ export function assertQueueGraph(graph) {
 }
 
 /** Uses H3's queue hooks and ComfyUI's serializer/API, then scopes native output. */
-export async function submitBoundGeneration({ app, api, hooks, graph, current, validate, delivering }) {
+export async function submitBoundGeneration({ app, api, hooks, graph, current, validate, delivering, label = 'Generation' }) {
   current('before-hooks');
   assertQueueGraph(graph);
   if (app.processingQueue) throw new Error('ComfyUI is preparing another queue request. Wait for it to finish.');
@@ -35,6 +35,6 @@ export async function submitBoundGeneration({ app, api, hooks, graph, current, v
     current('accepted');
     for (const widget of widgets) widget.afterQueued?.({ isPartialExecution: true });
     app.canvas?.setDirty?.(true, true);
-  } catch { warning = 'Generation was accepted, but the native after-queue controls could not finish. Check the original workflow before another run.'; }
+  } catch { warning = `${label} was accepted, but the native after-queue controls could not finish. Check the original workflow before another run.`; }
   return { prompt_id: promptId, target: scoped.target, warning };
 }

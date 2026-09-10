@@ -10,6 +10,7 @@ import { productionRoles } from './workflow-roles.mjs';
 import { resolvePlanDocument, planBranchSource } from './plan-source.mjs';
 import { generationProposal, validateGenerationPrompt } from './production-range.mjs';
 import { assertQueueGraph, submitBoundGeneration } from './bound-submission.mjs';
+import { deliveryConfiguration } from './delivery-core.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -17,10 +18,11 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery } = {}) {
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
+  const deliveries = new Map();
   const effectsStarted = new WeakSet();
   function root() { return app.rootGraph || app.graph?.rootGraph || app.graph; }
   function describe() {
@@ -92,7 +94,8 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     visit(root());
     let generationReason = '';
     try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, generationReason, generationVersion: !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function' ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const canSubmit = !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function';
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -249,6 +252,57 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         const queued = await app.queuePrompt(0, 1);
         if (queued === false) throw Object.assign(new Error('ComfyUI rejected the queue request. Check its validation message.'), { outcome: 'rejected' });
         return { queued: true, snapshot: snapshot() };
+      }
+      if (command.action === 'delivery-preview') {
+        const initial = assertCurrent(command);
+        if (initial.capabilities.deliveryVersion !== 1) throw new Error('The installed H3 pack needs the native saved-delivery snapshot interface.');
+        const config = deliveryConfiguration(initial, command);
+        const payload = await readTakes({ ...command, node: config.manager });
+        if (payload.editorial?.revision !== command.editorial_revision) throw new Error('The saved final cut changed. Refresh it before preparing delivery.');
+        const selected = payload.revisions.find(item => item.scene === command.scene && item.revision === command.take_revision && item.ready && item.take_kind !== 'editorial_alternate');
+        if (!selected) throw new Error('Select an available generation checkpoint as the delivery end.');
+        const selection = { ...JSON.parse(delivery.checkpointLocalSelectionJson(payload, command.project, selected)), _branch_id: command.branch_id, final_cut_branch_id: command.branch_id };
+        const prepared = await delivery.prepareDelivery(api, selection, command.editorial_revision);
+        assertCurrent(command);
+        const ticket = token(); deliveries.clear();
+        deliveries.set(ticket, { command, config, prepared });
+        return { data: { ticket, snapshot_id: prepared.snapshot_id, summary: prepared.summary, settings: config.settings }, snapshot: snapshot() };
+      }
+      if (command.action === 'deliver') {
+        const initial = assertCurrent(command), saved = deliveries.get(command.ticket);
+        if (!saved || initial.capabilities.deliveryVersion !== 1) throw new Error('Prepare and review this saved delivery again.');
+        const original = saved.command;
+        for (const field of ['binding', 'revision', 'plan', 'project', 'branch_id']) if (command[field] !== original[field]) throw new Error('The workflow context changed after delivery preparation. Review it again.');
+        const config = deliveryConfiguration(initial, original);
+        if (JSON.stringify(config) !== JSON.stringify(saved.config)) throw new Error('The assembly settings changed. Prepare delivery again.');
+        projectPlan({ ...command, node: config.manager });
+        await requireIdle(); assertCurrent(command);
+        const graph = root(), plan = refs.get(command.plan); let delivered = false, expectedRevision = command.revision;
+        deliveries.delete(command.ticket); // A consumed ticket never repeats a queue request.
+        try {
+          const result = await submitBoundGeneration({ app, api, graph, hooks: generationHooks, label: 'Delivery',
+            current(stage) {
+              const current = snapshot();
+              if (root() !== graph || current.binding !== command.binding || refs.get(command.plan) !== plan || JSON.stringify(deliveryConfiguration(current, original)) !== JSON.stringify(config)) throw new Error('The attached workflow or delivery settings changed during preparation.');
+              if (stage === 'after-hooks') expectedRevision = current.revision;
+              else if (current.revision !== expectedRevision) throw new Error('The workflow changed while delivery was being serialized.');
+            },
+            validate(prompt) {
+              const target = String(config.target).replaceAll('/', ':');
+              // Only overrides reviewed in the preview may differ from native serialization.
+              const actual = prompt?.output?.[target]?.inputs;
+              for (const [key, value] of Object.entries(config.settings)) if (!['filename', 'audio_source'].includes(key) && actual?.[key] !== value) throw new Error(`Native serialization changed assembly ${key}.`);
+              return delivery.deliveryPrompt(prompt, target, saved.prepared.snapshot_json, config.settings);
+            },
+            delivering() { effectsStarted.add(command); delivered = true; },
+          });
+          return { ...result, queued: true, data: { snapshot_id: saved.prepared.snapshot_id, summary: saved.prepared.summary }, snapshot: snapshot() };
+        } catch (thrown) {
+          const error = thrown instanceof Error ? thrown : new Error(String(thrown));
+          if (!delivered) error.outcome = 'rejected';
+          else if (error.outcome !== 'rejected') error.message += ' Delivery may have reached ComfyUI. Check the receipt and queue before submitting another job.';
+          throw error;
+        }
       }
       if (command.action === 'generate-range') {
         const initial = assertCurrent(command);

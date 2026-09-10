@@ -15,3 +15,5 @@ export function checkpointActivationMode(payload, selected, scope) {
   if (lineage.some(item => !payload.revisions.find(next => item.scene === next.scene && item.revision === next.revision)?.active)) return 'activate';
   return payload.revisions.some(item => item.active && item.scene > selected.scene && item.scene <= scope.end) ? 'rollback' : 'current';
 }
+
+export { checkpointLocalSelectionJson } from './h3_checkpoint_selection_native.mjs';

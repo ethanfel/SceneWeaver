@@ -6,7 +6,7 @@ Static census of nightly `326453d`: **89 registered node types**, **51 HTTP meth
 
 Every row remains subject to the M0 input/action audit. A generic widget inspector or an Open in ComfyUI shortcut is not proof of dedicated task parity. Milestones indicate completion targets; basic controls may land earlier. Legacy and experimental behavior keeps its upstream classification.
 
-The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview; 0.5.5 adds bounded native generation submission for supported flat workflows. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
+The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview; 0.5.5 adds bounded native generation submission for supported flat workflows; 0.5.6 adds frozen prefix assembly dependent on H3 PR #58. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
 
 ## Registered nodes
 
@@ -249,3 +249,7 @@ At each H3 integration update, compare registered IDs, input schemas, frontend a
 ## Storage inventory added in nightly 326453d
 
 The native Checkpoint Manager now has a project-wide read-only storage inspector and inventory JSON download. SceneWeaver coverage belongs to Deliver / recovery (M7): explicit scan, category sizes, filters, longest paths, project-switch invalidation and download. The report spans Original and named branches; a storage path is not branch ownership. Its unreferenced candidates are not deletion eligibility. Migration and integrity validation remain separate upstream work. No SceneWeaver storage inspector is implemented yet.
+
+## Proposed saved delivery interface
+
+[H3 PR #58](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/58), commit `e108f13d208c0cf21cb129ac1221c4b4170595b4`, adds `MiniMaxH3ChainDeliverySource`, POST `/delivery/prepare` and the native browser delivery helper. These are not included in the nightly census above. SceneWeaver 0.5.6 discovers this optional contract to prepare and assemble a frozen saved prefix; native chapter and separate final-cut branch selection still need companion controls. The exact source record is not yet a grouped download/recovery interface. See the implementation status for synthetic native media validation and remaining production checks.
