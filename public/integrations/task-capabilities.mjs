@@ -44,6 +44,7 @@ export function planTaskCapabilities(snapshot, planId) {
   }
   task('generate-range', 'Generate selected scene / range', generationReady, generationReady ? 'Uses native serialization and queue hooks for the selected assembly dependency path. Connected range controls, ALT drafts and subgraphs need dedicated adapters. Top-level continuation supports one scene only.' : !managed ? managedReason : generationReason);
   task('deliver', 'Assemble saved selection', managed && caps.deliveryVersion === 1 && deliveryTargets(nodes).length > 0, caps.deliveryVersion === 1 ? 'Freezes an exact saved lineage, final-cut pictures and captions, then queues the native isolated assembly recipe. Backend preparation validates source availability; unsupported ancillary input branches need their own adapters.' : 'The native H3 saved-delivery snapshot interface is required. Existing output previews remain available.');
+  task('editorial-apply', 'Edit saved sequence timing and captions', managed && nativeOwnership && caps.editorialVersion === 1, !managed ? managedReason : caps.editorialVersion === 1 ? 'Native preview supplies trim boundaries, resolved placement and continuation impact. Saving verifies the reviewed checkpoints, cut and asset catalog; generation order is unchanged.' : 'The native H3 saved-sequence command interface is required.');
   task('finish', 'Run finishing recipe', false, 'Requires exact saved-source selection and a native processing recipe adapter.');
   return { version: 1, planId, tasks };
 }

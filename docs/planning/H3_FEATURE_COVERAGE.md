@@ -6,7 +6,7 @@ Static census of nightly `326453d`: **89 registered node types**, **51 HTTP meth
 
 Every row remains subject to the M0 input/action audit. A generic widget inspector or an Open in ComfyUI shortcut is not proof of dedicated task parity. Milestones indicate completion targets; basic controls may land earlier. Legacy and experimental behavior keeps its upstream classification.
 
-The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview; 0.5.5 adds bounded native generation submission for supported flat workflows; 0.5.6 adds frozen prefix assembly dependent on H3 PR #58. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
+The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview; 0.5.5 adds bounded native generation submission for supported flat workflows; 0.5.6 adds frozen prefix assembly dependent on H3 PR #58; 0.5.7 adds saved timing/lock/caption editing dependent on H3 PR #59. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
 
 ## Registered nodes
 
@@ -253,3 +253,7 @@ The native Checkpoint Manager now has a project-wide read-only storage inspector
 ## Proposed saved delivery interface
 
 [H3 PR #58](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/58), commit `e108f13d208c0cf21cb129ac1221c4b4170595b4`, adds `MiniMaxH3ChainDeliverySource`, POST `/delivery/prepare` and the native browser delivery helper. These are not included in the nightly census above. SceneWeaver 0.5.6 discovers this optional contract to prepare and assemble a frozen saved prefix; native chapter and separate final-cut branch selection still need companion controls. The exact source record is not yet a grouped download/recovery interface. See the implementation status for synthetic native media validation and remaining production checks.
+
+## Proposed saved sequence commands
+
+[H3 PR #59](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/59), commit `9638949e28debc503d6cf90aa02a216ac8573c10`, adds POST `/editorial/command` and its native browser helper. This route is excluded from the unchanged nightly census above. SceneWeaver 0.5.7 uses native inspection, consequence preview and conditional saves for trims, placements, timing locks and caption settings. Chapter authoring, incoming blends, drag edits, soundtrack routing and durable local cut-draft recovery remain open.

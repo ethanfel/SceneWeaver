@@ -129,13 +129,13 @@ Design rules:
 | T05 | Create picture-only ALT, edit/restore ALT prompt and seed, render, compare and choose final cut while retaining base continuity/audio | Select saved ALT only | Edit Takes + Generate / M4 |
 | T06 | Preview/delete eligible revisions and processed artifacts; protect other branches, dependent takes and chapter snapshots | New | Version management / M4, M6 |
 | T07 | Chapter snapshots: seal partial/complete selection, view/recover an exact snapshot, inspect dependencies and retire explicitly | New | Edit Chapters / Deliver / M4, M7 |
-| V01 | Edit saved placements, gaps, supported trims, locks, chapter markers and incoming overlap/blend values | Reads editorial timing; ruler seeks | Edit timeline / M5 |
-| V02 | Validate editorial changes against raw context, future dependencies, ALT boundaries and native accepted ranges before saving | Partial backend checks on take selection | Edit Inspector + preflight / M5 |
+| V01 | Edit saved placements, gaps, supported trims, locks, chapter markers and incoming overlap/blend values | 0.5.7: native Cut inspector for trims, placements and locks requires H3 PR #59; chapters/blends/drag editing pending | Edit timeline / M5 |
+| V02 | Validate editorial changes against raw context, future dependencies, ALT boundaries and native accepted ranges before saving | 0.5.7: native trim grid, resolved timing and continuation preview; source-checked saves via H3 PR #59 | Edit Inspector + preflight / M5 |
 | V03 | Continuous synchronized preview, source/sequence comparison, matched-frame A/B, seam loop, thumbnail and waveform navigation | Sequence playback, basic A/B | Edit / Finish / M5 |
 | S01 | Full mix/vocals/instrumental bindings; exact source offsets; generated/source-guide/source-only/silent final routing | Asset track bindings and monitoring | Audio / M5 |
 | S02 | Per-scene Lip-sync and dedicated options, voice/reference inputs, carry/fresh audio decisions and source windows | Generic controls | Audio + Edit Inspector / M3, M5 |
 | S03 | Waveform navigation and monitoring controls with explicit solo/mute versus saved generation/delivery semantics | Player volume/source switches | Audio / M5 |
-| S04 | Lyrics/SRT text, subtitle asset selection, mode, offsets, timeline preview and supported native export behavior | Text edits and saved caption preview | Audio / M5 |
+| S04 | Lyrics/SRT text, subtitle asset selection, mode, offsets, timeline preview and supported native export behavior | 0.5.7: caption asset/mode/offset saves via H3 PR #59; lyric text and preview remain available | Audio + Cut Inspector / M5 |
 
 ### Finishing, delivery and advanced modes
 

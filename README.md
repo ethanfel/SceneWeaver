@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.6** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.7** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -15,7 +15,7 @@ The bottom navigation now has six production pages. **Workflow** in the top tool
 | Page | Available controls |
 | --- | --- |
 | Media | Project catalog, uploads/imports, tags, roles, reference enablement and source previews |
-| Edit | Saved sequence player, timeline seeking, scene prompt inspector and Takes/A–B comparison |
+| Edit | Saved sequence player, timeline seeking, scene prompts, native Cut inspector when supported, and Takes/A–B comparison |
 | Generate | Selected scene/range submission on supported native loops, job receipts and PreviewRelay monitor; live review in the render queue |
 | Finish | Saved original and processed take inventories, source preview and downloads |
 | Audio | Soundtrack assets, full mix/vocal/instrumental bindings and caption text |
@@ -38,6 +38,18 @@ The native assembly recipe retains blend, bitrate, color and output-copy setting
 Accepted ComfyUI job IDs remain in **Actions** after a lost result or companion reload while the parent tab stays open. Native H3 writes a `.delivery.json` record beside the project video, preserving source JSON and scalar settings. Connected audio/VAE dependencies remain in native workflow metadata/history; the record is not a self-contained media archive. Grouped record downloads and recovery across a parent-tab restart still need dedicated controls.
 
 Validation includes native H3 assembly of temporary synthetic media with real FFmpeg audio/video and captions, plus browser/adapter regression tests. Production GPU execution and the complete generation-to-delivery cycle remain unverified.
+
+## Saved cut editing (0.5.7)
+
+The inspector’s **Cut** tab edits the active branch’s saved timing and captions. It requires the native interface in draft **[H3 PR #59](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/59)**; it is not yet in audited nightly `326453d`. The existing viewer, prompt editor and workflow queue remain available without it.
+
+Choose an end from H3’s valid delivered-frame boundaries, set a requested start frame or leave it automatic, and use **Review timing**. The review shows resolved clips/gaps and any direct or indirect continuation failures. Saving a shortened endpoint can require regenerating affected later scenes before native assembly succeeds. Original checkpoint files and generation order remain unchanged. Saved timing locks appear on the timeline; save an unlock before changing a locked scene.
+
+The same tab selects the timed lyric asset, saved caption mode and offset. These settings affect subsequent native SRT delivery; the player’s CC switch only controls monitoring. Changes require an idle queue, explicit review and native ownership. H3 rejects a save if the reviewed cut, checkpoint metadata or catalog has changed.
+
+Local cut values survive scene/page navigation while that project remains attached. They are retained when a save is rejected, but are not yet backed up across branch/project switches or browser restarts. Receipts in the parent ComfyUI tab help reconcile a lost save result; refreshing reads current native state without resubmitting the edit. Chapter authoring, incoming blends, soundtrack policy, arbitrary in-trims, drag editing and durable cut-draft recovery remain roadmap work.
+
+The native tests verify preview/export agreement for a 168-frame synthetic sequence with a trimmed alternate, a black gap, base generated audio, silence in the gap and shifted SRT. These are CPU FFmpeg and temporary-project checks, not production GPU validation. The catalog recovery fix in PR #59 is also included in [PR #58](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/58), so previews can read a backup catalog without restoring files.
 
 ## Scene generation (0.5.5)
 

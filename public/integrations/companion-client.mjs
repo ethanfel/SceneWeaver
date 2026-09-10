@@ -18,7 +18,8 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial } = {}) {
+  const editorialPreviews = new Map();
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
@@ -95,7 +96,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     let generationReason = '';
     try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
     const canSubmit = !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function';
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -363,6 +364,28 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         if (!finalCut || !ownershipOptions) throw new Error('Reopen the companion from ComfyUI with an H3 version that supports revision-checked final-cut saves.');
         const payload = await readTakes(command), body = finalCutDocument(payload, command);
         const result = await projectRequest(command, `${H3}/editorial`, body);
+        if (!result.warning) refreshEditors();
+        return result;
+      }
+      if (command.action === 'editorial-inspect' || command.action === 'editorial-preview') {
+        if (!editorial) throw new Error('This H3 installation needs the native saved-sequence command interface.');
+        projectPlan(command);
+        if (command.action === 'editorial-preview') await requireIdle();
+        const body = { action: command.action === 'editorial-inspect' ? 'inspect' : 'preview', run_name: command.project, branch_id: command.branch_id, stamp: command.stamp, patch: command.patch };
+        const data = await editorial.editorialCommand(api, body);
+        projectPlan(command);
+        if (command.action === 'editorial-inspect') return { data, snapshot: snapshot() };
+        const ticket = token(); editorialPreviews.clear();
+        editorialPreviews.set(ticket, { command: { ...command }, body: { ...body, action: 'apply', preview_token: data.preview_token } });
+        return { data: { ticket, timeline: data.timeline, patch: data.patch }, snapshot: snapshot() };
+      }
+      if (command.action === 'editorial-apply') {
+        const preview = editorialPreviews.get(command.ticket);
+        if (!editorial || !ownershipOptions || !preview) throw new Error('Review this saved-sequence edit again before saving.');
+        if (['binding', 'revision', 'node', 'plan', 'project', 'branch_id'].some(key => preview.command[key] !== command[key])) throw new Error('The attached workflow context changed. Review the edit again.');
+        projectPlan(command); await requireIdle(); projectPlan(command);
+        editorialPreviews.delete(command.ticket);
+        const result = await projectRequest(command, `${H3}/editorial/command`, preview.body);
         if (!result.warning) refreshEditors();
         return result;
       }

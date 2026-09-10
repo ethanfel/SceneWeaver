@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ArrowDownLeft, ArrowLeft, ArrowRight, Braces, Copy, Link2, Plus, Trash2, Upload } from 'lucide-react';
 import type { Plan, Schemas, Shot, Value, Workflow } from '../types';
 import { inputSpecs, isLink, nodeTitle } from '../lib/workflow';
@@ -7,7 +8,7 @@ import { comfy } from '../lib/api';
 import { PlanSource } from './PlanSource';
 import { resolvePlanDocument } from '../../public/integrations/plan-source.mjs';
 
-type Props = { workflow: Workflow; sourceBridgeReady: boolean; schemas: Schemas; plan: Plan | null; planId: string; selected: number; nodeId: string; tab: string; setTab: (tab: string) => void; updateInput: (id: string, key: string, value: Value) => void; updatePlan: (plan: Plan) => void; select: (index: number) => void; selectNode: (id: string) => void; editJson: () => void; report: (error: string) => void; connected: boolean };
+type Props = { savedCut?: ReactNode; workflow: Workflow; sourceBridgeReady: boolean; schemas: Schemas; plan: Plan | null; planId: string; selected: number; nodeId: string; tab: string; setTab: (tab: string) => void; updateInput: (id: string, key: string, value: Value) => void; updatePlan: (plan: Plan) => void; select: (index: number) => void; selectNode: (id: string) => void; editJson: () => void; report: (error: string) => void; connected: boolean };
 export function Inspector(p: Props) {
   const node = p.workflow.prompt[p.nodeId], planNode = p.workflow.prompt[p.planId], shot = p.plan?.shots[p.selected];
   const source = resolvePlanDocument(p.workflow.prompt, p.planId);
@@ -25,9 +26,9 @@ export function Inspector(p: Props) {
     p.updatePlan({ ...p.plan, shots }); p.select(p.selected + 1);
   };
   return <aside className="inspector panel">
-    <div className="panel-title"><span>Inspector</span><span className="eyebrow">{p.tab === 'scene' ? 'SCENE' : 'WORKFLOW'}</span></div>
-    <div className="tabs"><button className={p.tab === 'scene' ? 'active' : ''} onClick={() => p.setTab('scene')}>Scene</button><button className={p.tab === 'node' ? 'active' : ''} onClick={() => p.setTab('node')}>Node settings</button></div>
-    <div className="inspector-body">
+    <div className="panel-title"><span>Inspector</span><span className="eyebrow">{p.tab === 'scene' ? 'SCENE' : p.tab === 'cut' ? 'SAVED CUT' : 'WORKFLOW'}</span></div>
+    <div className="tabs"><button className={p.tab === 'scene' ? 'active' : ''} onClick={() => p.setTab('scene')}>Scene</button><button className={p.tab === 'cut' ? 'active' : ''} onClick={() => p.setTab('cut')}>Cut</button><button className={p.tab === 'node' ? 'active' : ''} onClick={() => p.setTab('node')}>Node settings</button></div>
+    <div className="inspector-body"><div hidden={p.tab !== 'cut'}>{p.savedCut}</div>
       {p.tab === 'scene' && <PlanSource workflow={p.workflow} planId={p.planId} inspect={p.selectNode} bridgeReady={p.sourceBridgeReady}/>}
       {p.tab === 'scene' && p.plan && planNode ? <fieldset className="scene-fields" disabled={!p.sourceBridgeReady || source.status !== 'resolved' || source.editable === false}>
         <div className="inspector-heading"><span className="section-label">{shot ? `SCENE ${String(p.selected + 1).padStart(2, '0')}` : 'SCENE PLAN'}</span><button className="icon-button" onClick={p.editJson} aria-label="Edit plan JSON"><Braces size={16}/></button></div>
@@ -49,7 +50,7 @@ export function Inspector(p: Props) {
           return isLink(value) ? <div className="connection-field" key={key}><span>{key.replaceAll('_', ' ')}</span><button onClick={() => p.selectNode(value[0])}><Link2 size={12}/>{p.workflow.prompt[value[0]] ? nodeTitle(value[0], p.workflow.prompt[value[0]]) : `Missing node ${value[0]}`}<small>out {value[1]}</small></button></div>
             : <fieldset className="node-widget-field" disabled={!p.sourceBridgeReady || Array.isArray(node._meta?.editable) && !node._meta.editable.includes(key)} key={key}><Field label={key} value={value} spec={spec} onChange={v => p.updateInput(p.nodeId, key, v)}/>{key === 'image' && node.class_type === 'LoadImage' && <label className="button file-label"><Upload size={13}/>Upload image<input type="file" accept="image/*" disabled={!p.connected} onChange={async e => { const file = e.target.files?.[0]; if (!file) return; try { const form = new FormData(); form.append('image', file); const data = await comfy<{ name: string; subfolder?: string }>('/upload/image', { method: 'POST', body: form }); p.updateInput(p.nodeId, key, [data.subfolder, data.name].filter(Boolean).join('/')); } catch (error) { p.report(String(error)); } }}/></label>}</fieldset>;
         })}
-      </> : <div className="empty-small">{p.tab === 'scene' ? 'Select an H3 Plan node to edit scenes.' : 'Select a workflow node to inspect all of its inputs.'}</div>}
+      </> : p.tab !== 'cut' && <div className="empty-small">{p.tab === 'scene' ? 'Select an H3 Plan node to edit scenes.' : 'Select a workflow node to inspect all of its inputs.'}</div>}
     </div>
   </aside>;
 }

@@ -68,6 +68,11 @@ export async function discoverH3(api, options = {}) {
     });
   } else check('assets', 'unavailable', 'The H3 Asset Carousel extension could not be read.');
   if (studio.status === 'fulfilled') {
+    await probe('editorial', 'Native saved-sequence inspection, edit previews and conditional saves available.', async () => {
+      const value = await module(studio.value, 'h3_editorial_commands.mjs');
+      if (value.EDITORIAL_COMMAND_VERSION !== 1 || !functions(value, ['editorialCommand'])) throw new Error();
+      adapters.editorial = value;
+    });
     await probe('workingBranches', 'Native working-branch identity and request-path helpers available. Branch writes still require a dedicated command adapter.', async () => {
       const value = await module(studio.value, 'h3_working_branches.mjs');
       if (!functions(value, ['workingBranchId', 'branchRequestPath']) || !studio.value.source.includes('working_branch_id')) throw new Error();

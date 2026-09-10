@@ -1,3 +1,4 @@
+import { installEditorialFixture } from './editorial-backend.mjs';
 import express from 'express';
 import http from 'node:http';
 import { resolve } from 'node:path';
@@ -20,6 +21,7 @@ const secondTake = { ...baseTake, scene: 2, scene_id: 'a_moment_of_stillness', r
 const playbackCheckpoints = [{ ...baseTake, presentation_video: media('final-alt.webm'), presentation_revision: 'final-alt', alternates: [{ revision: 'final-alt', base_revision: 'base', media_mode: 'picture_only', used_in_final_cut: true, video: media('final-alt.webm') }] }, secondTake];
 const editorial = { subtitles: { mode: 'preview_srt', asset_id: 'soundtrack', offset_seconds: 0 }, trims: [{ scene_id: 'the_arrival', out_frame: 48 }], placements: [{ scene_id: 'a_moment_of_stillness', start_frame: 240 }, { scene_id: 'the_departure', start_frame: 480 }] };
 let branchData = null;
+installEditorialFixture(app, branch => branch === '1'.repeat(32) ? branchData : takeData, () => catalog().assets, action => takeActions.push(action));
 const soundtrackAsset = { id: 'soundtrack', tag: 'score', kind: 'audio', role: 'source_track', enabled: true, lyrics: '1\n00:00:00,000 --> 00:00:02,000\nFirst scene caption\n\n2\n00:00:10,000 --> 00:00:14,000\nSecond scene caption' };
 let assets = [{ id: 'hero', tag: 'hero', kind: 'image', role: 'picture', enabled: true, original_name: 'hero.png' }];
 const catalog = () => ({ project: 'sceneweaver_first_film', revision: String(assets[0].tag), assets: playback ? [...assets, soundtrackAsset] : assets });
