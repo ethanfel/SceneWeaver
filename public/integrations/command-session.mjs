@@ -1,4 +1,4 @@
-const reads = new Set(['snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
+const reads = new Set(['prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
 
 // Receipts live in the parent tab, so a companion refresh can recover the
 // outcome without replaying a mutation. They are not durable H3 job records.

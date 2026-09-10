@@ -1,3 +1,4 @@
+import { PromptHistory, downloadPrompt, type HistoryConnection } from './PromptHistory';
 import { useEffect, useRef, useState } from 'react';
 import type { Plan } from '../types';
 import { promptText } from '../lib/h3';
@@ -15,11 +16,12 @@ export type PromptInspection = {
   items: { label: string; detail?: string }[]; proposal: Proposal | null;
 };
 type LocalPrompt = { base: string; value: string; undo: string[]; redo: string[] };
-type Props = { plan: Plan | null; selected: number; active: boolean; context: string; available: boolean; editable: boolean; duration: number; select: (index: number) => void; inspect: (request: PromptRequest) => Promise<PromptInspection>; stage: (value: string) => Promise<boolean | undefined> };
+type Props = { history: HistoryConnection; plan: Plan | null; selected: number; active: boolean; context: string; available: boolean; editable: boolean; duration: number; select: (index: number) => void; inspect: (request: PromptRequest) => Promise<PromptInspection>; stage: (value: string) => Promise<boolean | undefined> };
 
 export function PromptWorkspace(p: Props) {
   // Per-scene text survives page/scene navigation. Only explicitly staged text
   // belongs to the app's durable browser draft; reload/conflict choices are visible.
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, LocalPrompt>>({});
   const shot = p.plan?.shots[p.selected], source = promptText(shot?.prompt);
   const id = `${p.selected}:${canonicalSceneId(shot?.id, p.selected)}`;
@@ -80,6 +82,8 @@ export function PromptWorkspace(p: Props) {
     {!p.available && <p className="playback-notice">Native prompt tools require a current live attachment with H3’s prompt editor helpers. The Scene Inspector remains available.</p>}
     {conflict && <p role="alert">The staged scene prompt changed elsewhere. Your local text is kept. Copy it if needed, then reload the scene draft before staging.</p>}
     <div className="prompt-toolbar"><button onClick={() => setView('plain')} aria-pressed={view === 'plain'}>Plain text</button><button onClick={() => setView('rich')} aria-pressed={view === 'rich'} disabled={!data}>Highlighted view</button><button disabled={!draft.undo.length || busy} onClick={() => undo()}>Undo prompt</button><button disabled={!draft.redo.length || busy} onClick={() => undo(true)}>Redo prompt</button><button onClick={() => { setDrafts(all => ({ ...all, [id]: { base: source, value: source, undo: [...draft.undo, text].slice(-100), redo: [] } })); setProposal(null); }}>Reload scene draft</button></div>
+    <div className="prompt-toolbar"><button disabled={!p.history.available} onClick={() => setHistoryOpen(true)}>Saved prompt history</button><button onClick={() => downloadPrompt(text, canonicalSceneId(shot.id, p.selected))}>Export prompt text</button><label className="button file-label">Import prompt text<input type="file" accept="text/plain,.txt" disabled={!p.editable || busy} onChange={async event => { const file = event.target.files?.[0], key = requestKey; event.target.value = ''; if (!file) return; if (file.size > 2_000_000) { setError('Prompt text files must be at most 2 MB.'); return; } try { const value = await file.text(); if (mounted.current && currentKey.current === key) { write(value); focus(0); } } catch (reason) { if (mounted.current && currentKey.current === key) setError(String(reason)); } }}/></label></div>
+    {historyOpen && <PromptHistory key={`${id}:${JSON.stringify(p.history.context)}`} connection={p.history} currentText={text} editable={p.editable && !busy && !conflict} useText={value => { write(value); focus(0); }} close={() => setHistoryOpen(false)}/>}
     <div className="prompt-workspace-body">
       <div className="prompt-document">
         <textarea ref={input} aria-label="Expanded scene prompt" spellCheck={false} hidden={view !== 'plain'} value={text} disabled={!p.available || !p.editable || busy} onChange={event => { write(event.target.value); setCaret(event.target.selectionStart); }} onSelect={event => setCaret(event.currentTarget.selectionStart)} onKeyDown={event => {

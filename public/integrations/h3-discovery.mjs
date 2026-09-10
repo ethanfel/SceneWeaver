@@ -70,6 +70,12 @@ export async function discoverH3(api, options = {}) {
       if (!functions(value, ['projectAudioTrackBindings'])) throw new Error(); adapters.audioTracks = value;
     });
   } else check('assets', 'unavailable', 'The H3 Asset Carousel extension could not be read.');
+  await probe('promptHistory', 'Native prompt revision tree available; history write support is checked with the server.', async () => {
+    const editor = await entry('h3_chain_scene_prompt_editor.js');
+    const value = await module(editor, 'h3_prompt_history_core.mjs');
+    if (!functions(value, ['promptRevisionTree'])) throw new Error();
+    adapters.promptHistory = value;
+  });
   await probe('promptTools', 'Native prompt schema, section proposals, completions and rich token analysis available.', async () => {
     const editor = await entry('h3_chain_scene_prompt_editor.js');
     const rich = await module(editor, 'h3_rich_prompt_editor_core.mjs');

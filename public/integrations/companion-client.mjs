@@ -1,3 +1,4 @@
+import { createPromptHistory } from './prompt-history.mjs';
 import { inspectPromptDraft } from './prompt-tools.mjs';
 import { PROTOCOL, validateEdits } from './bridge-core.mjs';
 import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
@@ -20,7 +21,13 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false, promptTools } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false, promptTools, promptHistory } = {}) {
+  const history = typeof promptHistory?.promptRevisionTree === 'function' && typeof planAuthoring?.parsePlanJson === 'function' && typeof planAuthoring?.safeShotId === 'function' && createPromptHistory({ api, native: promptHistory, verify: command => {
+    projectPlan(command);
+    const current = snapshot(), source = resolvePlanDocument(current.nodes, command.plan);
+    const parsed = planAuthoring?.parsePlanJson(source.text), index = command.scene - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= (parsed?.shots?.length || 0) || planAuthoring.safeShotId(parsed.shots[index].id, `clip_${String(index + 1).padStart(4, '0')}`) !== command.scene_id) throw new Error('The history scene no longer matches the applied Plan. Apply scene structure changes before reading its history.');
+  }, write: projectRequest });
   const editorialPreviews = new Map();
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
@@ -98,7 +105,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     let generationReason = '';
     try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
     const canSubmit = !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function';
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, promptToolsVersion: promptTools && typeof planAuthoring?.promptTextToLines === 'function' && typeof planAuthoring?.sharedPrompt === 'function' ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, promptHistoryVersion: history && planAuthoring ? 1 : 0, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, promptToolsVersion: promptTools && typeof planAuthoring?.promptTextToLines === 'function' && typeof planAuthoring?.sharedPrompt === 'function' ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -167,7 +174,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     }
     effectsStarted.add(command);
     const response = await api.fetchApi(command.plan && !command.action.startsWith('asset-') ? branchPath(path, command.branch_id) : path, requestOptions), data = await response.json();
-    if (!response.ok) throw new Error(data.error || `H3 returned HTTP ${response.status}`);
+    if (!response.ok) { const error = new Error(data.error || `H3 returned HTTP ${response.status}`); error.httpStatus = response.status; throw error; }
     // A completed server write is never redirected onto a newly selected graph.
     if (snapshot().binding !== command.binding || refs.get(command.node) !== node || widget(node, 'run_name')?.value !== command.project) return { data, warning: 'The server action completed, but the ComfyUI tab or project changed. Reattach to refresh it.' };
     if (data.catalog) {
@@ -185,6 +192,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     return { data, snapshot: snapshot() };
   }
   async function execute(command) {
+      if (['prompt-history-list', 'prompt-history-revision', 'prompt-history-mutate'].includes(command.action)) {
+        if (!history) throw new Error('The native H3 prompt history helper is unavailable.');
+        if (command.action === 'prompt-history-mutate') return history.mutate(command);
+        return { data: await history[command.action === 'prompt-history-list' ? 'inspect' : 'revision'](command) };
+      }
       if (command.action === 'snapshot') return { snapshot: snapshot() };
       if (command.action === 'plan-edit' || command.action === 'prompt-tools') {
         const current = assertCurrent(command), source = resolvePlanDocument(current.nodes, command.plan);

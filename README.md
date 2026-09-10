@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.10** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.11** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -70,6 +70,12 @@ In **0.5.2**, scene editing follows the Plan's effective text source. Supported 
 In **0.5.3**, **Branches** opens the native branch manager: save authoring, save and switch, open saved settings while retaining native recovery drafts, create an empty branch or fork through the selected scene, reload, recover, retry a pending operation, and change the project default. These actions require the H3 browser interface proposed in [H3 PR #57](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/57), currently on `sceneweaver-branch-controls`. Existing main/nightly installations keep branch following and show why commands are unavailable. The interface must be installed and the ComfyUI tab refreshed; a SceneWeaver update alone cannot add it.
 
 ## September 2026 H3 compatibility update
+
+In **0.5.11**, **Edit → Prompt → Saved prompt history** browses the selected scene's native revision tree, including executed drafts, ancestry, labels and archived revisions. Select a revision to compare its saved text with your current editor. **Use revision text** loads it locally; **Stage prompt → Apply to ComfyUI** restores it to the original workflow source. Import/export `.txt` also stays local until you stage and apply.
+
+Saving, forking, labeling, activating, archiving and deleting history require the conditional command API proposed in draft [H3 PR #61](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/61), branch `sceneweaver-prompt-history`. Existing installations can read Original's history; named-branch reads require H3 to echo the requested branch identity. Unsupported writes stay disabled. A SceneWeaver update alone does not install the native API. History's active revision and the workflow prompt are separate; history does not include shared direction, seeds, media or effective/ALT prompt comparisons.
+
+History writes review the native revision before saving. If the acknowledgement is lost, SceneWeaver checks the native receipt and retains the exact request for a safe retry while the parent ComfyUI tab stays open. Native receipts and interrupted-write recovery survive a server restart; the parent's unsent request buffer does not survive closing that tab. Refresh ComfyUI and reopen SceneWeaver after updating.
 
 In **0.5.10**, **Edit → Prompt** opens the expanded prompt workspace. It uses the installed H3 helpers for schema checks, section navigation, proposed missing structure/keyframe alignment, highlighted tokens and completions at the cursor (`Ctrl+Space` for manual suggestions). Project aliases come from the Carousel explicitly connected to the selected Plan; scheduled and separately wired native references are not yet checked. Schema selection does not change the workflow's generation mode.
 
