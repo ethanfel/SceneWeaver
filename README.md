@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.11** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.12** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -70,6 +70,12 @@ In **0.5.2**, scene editing follows the Plan's effective text source. Supported 
 In **0.5.3**, **Branches** opens the native branch manager: save authoring, save and switch, open saved settings while retaining native recovery drafts, create an empty branch or fork through the selected scene, reload, recover, retry a pending operation, and change the project default. These actions require the H3 browser interface proposed in [H3 PR #57](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/57), currently on `sceneweaver-branch-controls`. Existing main/nightly installations keep branch following and show why commands are unavailable. The interface must be installed and the ComfyUI tab refreshed; a SceneWeaver update alone cannot add it.
 
 ## September 2026 H3 compatibility update
+
+In **0.5.12**, **Media** adds project folder navigation and an **Organize** action on asset cards. Create, rename, color, reorder or remove folders; move cards through the folder selector or drag them onto a folder. Reorder cards within the current filter while preserving other positions, duplicate cards with native provenance, and review deletion with selected-Plan tag mentions, track-group membership and shared-media information. Removing a folder unfiles its cards. Duplicating a card shares its media; a duplicated Source track starts disabled. Asset deletion requires confirmation and protects grouped stems and shared media.
+
+These writes require the native interface in draft [H3 PR #62](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/62), branch `sceneweaver-asset-library`. Older H3 installations retain folder browsing and existing metadata controls. With the new API, metadata edits also use the reviewed library revision. Lost acknowledgements are checked against native receipts; an explicit retry uses the exact retained request while the parent ComfyUI tab remains open. Native receipts survive server restart. Refresh ComfyUI and reopen SceneWeaver after installing updates.
+
+Libraries are shared across working branches. Usage information covers the selected Plan's literal tag mentions and the current catalog, not every workflow, saved branch, schedule or archive. These controls do not rewrite prompt references. Cross-project copying and complete usage analysis remain on the roadmap.
 
 In **0.5.11**, **Edit → Prompt → Saved prompt history** browses the selected scene's native revision tree, including executed drafts, ancestry, labels and archived revisions. Select a revision to compare its saved text with your current editor. **Use revision text** loads it locally; **Stage prompt → Apply to ComfyUI** restores it to the original workflow source. Import/export `.txt` also stays local until you stage and apply.
 

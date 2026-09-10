@@ -1,4 +1,5 @@
 import { installPromptHistoryFixture } from './prompt-history-backend.mjs';
+import { installAssetLibraryFixture } from './asset-library-backend.mjs';
 import { installEditorialFixture } from './editorial-backend.mjs';
 import express from 'express';
 import http from 'node:http';
@@ -9,6 +10,7 @@ import { WebSocketServer } from 'ws';
 import { createApp } from '../server/app.mjs';
 const app = express(); app.use(express.json({ limit: '30mb' }));
 const promptHistoryFixture = installPromptHistoryFixture(app);
+const assetLibraryFixture = installAssetLibraryFixture(app);
 const schemas = JSON.parse(readFileSync('public/examples/h3-schemas.json'));
 const starter = JSON.parse(readFileSync('public/examples/h3-starter.api.json'));
 const upstream = http.createServer(app), ws = new WebSocketServer({ server: upstream });
@@ -74,7 +76,7 @@ app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock
 app.get('/minimax_h3_context_loop/project-assets', (_req, res) => res.json(catalog()));
 app.post('/minimax_h3_context_loop/project-assets/update', (req, res) => { if (req.body.asset_id === soundtrackAsset.id) Object.assign(soundtrackAsset, { ...req.body.changes, ...(req.body.changes.options ? { options: { ...soundtrackAsset.options, ...req.body.changes.options } } : {}) }); assets = assets.map(asset => asset.id === req.body.asset_id ? { ...asset, ...req.body.changes } : asset); res.json({ catalog: catalog() }); });
 app.get('/minimax_h3_context_loop/project-assets/media', (req, res) => catalog().assets.find(asset => asset.id === req.query.asset)?.kind === 'audio' ? res.sendFile(resolve('e2e/fixtures/audio.wav')) : res.type('image/svg+xml').send('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#334139"/><circle cx="120" cy="65" r="25" fill="#829589"/></svg>'));
-app.post('/test/reset', (_req, res) => { promptHistoryFixture.reset(); branchData = null; delete soundtrackAsset.options; soundtrackAsset.lyrics = '1\n00:00:00,000 --> 00:00:02,000\nFirst scene caption\n\n2\n00:00:10,000 --> 00:00:14,000\nSecond scene caption'; assets = assets.slice(0, 1); takeData = null; takeActions = []; pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; relayInstalled = false; relayFeeds.clear(); thumbnails = false; thumbnailUnavailable = false; thumbnailRevision = 'b'.repeat(32); res.json({}); });
+app.post('/test/reset', (_req, res) => { assetLibraryFixture.reset(); promptHistoryFixture.reset(); branchData = null; delete soundtrackAsset.options; soundtrackAsset.lyrics = '1\n00:00:00,000 --> 00:00:02,000\nFirst scene caption\n\n2\n00:00:10,000 --> 00:00:14,000\nSecond scene caption'; assets = assets.slice(0, 1); takeData = null; takeActions = []; pending = []; reviews = []; submissions = []; decisions = []; playback = false; adjacent = false; assets[0].tag = 'hero'; relayInstalled = false; relayFeeds.clear(); thumbnails = false; thumbnailUnavailable = false; thumbnailRevision = 'b'.repeat(32); res.json({}); });
 app.post('/test/takes', (_req, res) => {
   playback = true;
   const base = { ...baseTake, revision: 'a'.repeat(32) }, alt = { ...alternate, revision: 'b'.repeat(32), alternate_of_revision: base.revision };

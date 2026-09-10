@@ -1,4 +1,5 @@
-const reads = new Set(['prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
+const reads = new Set(['asset-library-inspect', 'prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
+const concurrentReads = new Set(['snapshot', 'asset-library-inspect']);
 
 // Receipts live in the parent tab, so a companion refresh can recover the
 // outcome without replaying a mutation. They are not durable H3 job records.
@@ -15,14 +16,15 @@ export function createCommandSession(adapter, publish = () => {}, { limit = 100,
     if (!id || typeof id !== 'string' || id.length > 128 || !command || typeof command.action !== 'string') return { error: 'Invalid companion command.', outcome: 'rejected' };
     if (command.action === 'command-status') return { result: { data: records.get(command.request_id) || null } };
     if (seen.has(id)) return { error: 'This action ID was already accepted. Check its receipt and current ComfyUI state instead of submitting it again.', outcome: records.get(id)?.status || 'uncertain', receipt: records.get(id) };
-    if (processing && command.action !== 'snapshot') return { error: 'Another companion action is in progress.', outcome: 'rejected' };
+    if (processing && !concurrentReads.has(command.action)) return { error: 'Another companion action is in progress.', outcome: 'rejected' };
     const tracked = !reads.has(command.action);
     if (tracked && seen.size >= maxIds) return { error: 'This companion session has reached its action limit. Reopen SceneWeaver from ComfyUI.', outcome: 'rejected' };
     if (tracked) seen.add(id);
     const receipt = { id, action: command.action, binding: command.binding, plan: command.plan || '', project: command.project || '', branch: command.branch_id || '', revision: command.revision, status: 'running', startedAt: now() };
     if (tracked) update(receipt);
-    // Snapshot/status reads remain available while a long upload/save runs.
-    const locks = command.action !== 'snapshot';
+    // Library inspection is also read-only and validates its project around
+    // the request; Media and Audio may inspect the shared library together.
+    const locks = !concurrentReads.has(command.action);
     if (locks) processing = true;
     try {
       const result = await adapter.command(command);

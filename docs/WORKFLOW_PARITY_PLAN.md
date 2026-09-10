@@ -87,7 +87,7 @@ Design rules:
 | ID | Required parity | 0.4 baseline | Destination / completion |
 |---|---|---|---|
 | A01 | Upload, browse input/output/other runs, import and preview original media; show metadata and unavailable sources | Upload/input-path import, search/filter, basic previews | Media / M2 |
-| A02 | Tag/role/enabled edits, duplication, ordering, folders, membership, cross-project copies and deletion with usage information | Basic metadata edits | Media / M2 |
+| A02 | Tag/role/enabled edits, duplication, ordering, folders, membership, cross-project copies and deletion with usage information | 0.5.12 folder browsing, organization, membership, ordering, duplication and deletion with selected-Plan/catalog usage; conditional writes require H3 PR #62. Cross-project copies, complete usage analysis and production verification remain open | Media / M2 |
 | A03 | Grouped-track/project duplication remaps IDs and preserves source/derived provenance | Native only | Media / M2 |
 | A04 | Picture crop/placement, dimensions or megapixels, aspect lock, resampling and output snapping; create derived variants | New | Media source viewer / M2 |
 | A05 | Model-based asset upscale through the Carousel's isolated job; capture a saved review frame as a tagged picture | New | Media / M2 |
