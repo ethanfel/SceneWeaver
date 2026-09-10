@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ChevronLeft, ChevronRight, Clapperboard, Maximize, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
-import type { PlaybackSegment, PreviewMedia, SubtitleCue } from '../types';
+import type { CapturedFrame, PlaybackSegment, PreviewMedia, SubtitleCue } from '../types';
 import { timecode } from '../lib/h3';
 import { sequenceDuration, sequenceSpan, subtitleAt, type SequenceEntry } from '../lib/playback';
 
@@ -12,10 +12,12 @@ type Props = {
   previous?: () => void; next?: () => void; onTime: (seconds: number) => void; onScene: (index: number) => void;
   report: (message: string) => void; attach: () => void; hasScene: boolean;
   active?: boolean; onPlay?: () => void;
+  onCapture?: (frame: CapturedFrame) => void;
 };
-export function PreviewPlayer({ media, segment, entries, controls, selectionKey, isolated, sourceUrl, sourceSeek, cues, subtitleOffset, captionsDefault, previous, next, onTime, onScene, report, attach, hasScene, active: visible = true, onPlay }: Props) {
+export function PreviewPlayer({ media, segment, entries, controls, selectionKey, isolated, sourceUrl, sourceSeek, cues, subtitleOffset, captionsDefault, previous, next, onTime, onScene, report, attach, hasScene, active: visible = true, onPlay, onCapture }: Props) {
   const video = useRef<HTMLVideoElement>(null), generated = useRef<HTMLAudioElement>(null), soundtrack = useRef<HTMLAudioElement>(null), surface = useRef<HTMLDivElement>(null);
   const [sequence, setSequence] = useState(!isolated && Boolean(segment));
+  const [frameReady, setFrameReady] = useState(false);
   const [clip, setClip] = useState({ media, segment });
   const [playing, setPlaying] = useState(false), [position, setPosition] = useState(segment?.start || 0), [duration, setDuration] = useState(0);
   const intent = useRef(false), cursor = useRef(position), exhausted = useRef(false), buffering = useRef(false);
@@ -132,6 +134,7 @@ export function PreviewPlayer({ media, segment, entries, controls, selectionKey,
   }, [selectionKey]);
   useLayoutEffect(() => {
     exhausted.current = false; buffering.current = false; setDuration(0);
+    setFrameReady(false);
     const picture = video.current, sidecar = generated.current;
     if (video.current?.readyState) ready();
     else { sync(intent.current && !video.current); startVideo(); }
@@ -166,15 +169,28 @@ export function PreviewPlayer({ media, segment, entries, controls, selectionKey,
   const nextEntry = entries.find(entry => entry.start > position);
   const previousScene = sequence ? previousEntry && (() => jump(previousEntry.start)) : previous;
   const nextScene = sequence ? nextEntry && (() => jump(nextEntry.start)) : next;
+  const capture = () => {
+    const element = video.current;
+    if (!onCapture || !shown.savedSource || !element || element.readyState < 2 || element.seeking || element.error || !element.videoWidth || !element.videoHeight || !Number.isFinite(element.currentTime) || element.currentTime < 0 || element.currentSrc !== new URL(shown.url, location.href).href) return;
+    stop();
+    try {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 1280 / element.videoWidth);
+      canvas.width = Math.round(element.videoWidth * scale); canvas.height = Math.round(element.videoHeight * scale);
+      const context = canvas.getContext('2d'); if (!context) throw new Error('Frame preview is unavailable.');
+      context.drawImage(element, 0, 0, canvas.width, canvas.height);
+      onCapture({ source: shown.savedSource, time_seconds: element.currentTime, image: canvas.toDataURL('image/jpeg', .9), name: shown.name });
+    } catch (reason) { report(String(reason)); }
+  };
   return <>
-    <div className="playback-mode"><div role="group" aria-label="Playback mode"><button aria-pressed={sequence} disabled={!total} onClick={() => changeMode(true)}>Sequence</button><button aria-pressed={!sequence} disabled={sequence && !active} onClick={() => changeMode(false)}>Clip</button></div><span>{sequence ? 'Saved cut · plays through scenes and gaps' : 'Single clip · stops at its end'}</span></div>
+    <div className="playback-mode"><div role="group" aria-label="Playback mode"><button aria-pressed={sequence} disabled={!total} onClick={() => changeMode(true)}>Sequence</button><button aria-pressed={!sequence} disabled={sequence && !active} onClick={() => changeMode(false)}>Clip</button></div><span>{sequence ? 'Saved cut · plays through scenes and gaps' : 'Single clip · stops at its end'}</span>{onCapture && <button disabled={!visible || !shown.savedSource || !frameReady} onClick={capture}>Capture frame</button>}</div>
     <div className="viewer-canvas" ref={surface}><div className="viewer-overlay"><span>{active ? `SCENE ${String(active.index + 1).padStart(2, '0')}` : sequence ? 'TIMELINE GAP' : 'SOURCE VIEWER'}</span><span>{shown.url ? 'PREVIEW' : sequence && !active ? 'GAP' : 'AWAITING RENDER'}</span></div>
       {shown.url ? image ? <img src={shown.url} alt={shown.name}/> : audio ? <audio key={shown.url} src={shown.url} controls/> : <video key={mediaKey} ref={video} src={shown.url} preload="auto" playsInline
-        onLoadedMetadata={ready} onCanPlay={() => { buffering.current = false; startVideo(); }}
-        onSeeking={() => { if (intent.current) pauseAudio(); }} onSeeked={() => sync(intent.current)}
+        onLoadedMetadata={ready} onLoadedData={() => setFrameReady(true)} onCanPlay={() => { setFrameReady(true); buffering.current = false; startVideo(); }}
+        onSeeking={() => { setFrameReady(false); if (intent.current) pauseAudio(); }} onSeeked={() => { setFrameReady(true); sync(intent.current); }}
         onEnded={() => { exhausted.current = true; buffering.current = false; if (!sequence) { publish(usableDuration); stop(); } }}
         onWaiting={() => { buffering.current = true; pauseAudio(); }} onPlaying={() => { buffering.current = false; sync(intent.current); }}
-        onError={() => { stop(); report('This video could not be played. Try another take or download the clip.'); }} onClick={toggle}/>
+        onError={() => { setFrameReady(false); stop(); report('This video could not be played. Try another take or download the clip.'); }} onClick={toggle}/>
         : <div className="viewer-empty"><div className="frame-corners"><Clapperboard size={43} strokeWidth={1}/></div><h2>{sequence && !active ? 'Timeline gap' : hasScene ? shown.name.replaceAll('_', ' ') : 'Your ComfyUI production'}</h2><p>{sequence && !active ? 'The soundtrack continues here.' : hasScene ? `No saved video for this scene yet.${sequence ? ' Playback continues over its planned duration.' : ''}` : 'Attach your open workflow to see its sequence and project.'}</p>{!hasScene && <button onClick={attach}>Attach live workflow</button>}</div>}
       {shown.audioUrl && <audio data-testid="generated-audio" ref={generated} key={`${active?.id}:${shown.audioUrl}`} src={shown.audioUrl} preload="auto" onLoadedMetadata={() => sync(intent.current)} onError={() => setAudioError('The generated audio file could not be played.')} hidden/>}
       {source && <audio data-testid="source-audio" ref={soundtrack} key={source} src={source} preload="auto" onLoadedMetadata={() => sync(intent.current)} onError={() => setAudioError('The source soundtrack could not be played. Refresh Plan Studio’s presentation in ComfyUI.')} hidden/>}

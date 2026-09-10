@@ -1,4 +1,4 @@
-import type { Checkpoint, Editorial, Plan, PlaybackSegment, PreviewMedia, Revision, SubtitleCue, Value } from '../types';
+import type { MediaFile, SavedFrameSource, Checkpoint, Editorial, Plan, PlaybackSegment, PreviewMedia, Revision, SubtitleCue, Value } from '../types';
 import { checkpointFor, rawFrames } from './h3';
 import { H3, mediaUrl } from './api';
 
@@ -19,10 +19,14 @@ export function sequenceSpan(entries: SequenceEntry[], seconds: number): Sequenc
   return entry ? { start: entry.start, duration: entry.duration, entry } : undefined;
 }
 
+export function savedFrameSource(file: MediaFile | undefined, scene: number, revision: string): SavedFrameSource | undefined {
+  if (!file || !Number.isInteger(scene) || scene < 1 || !/^[0-9a-f]{32}$/.test(revision) || (file.type || 'output') !== 'output' || !/\.(mp4|mkv|webm|mov|avi|m4v|mpeg|mpg)$/i.test(file.filename)) return undefined;
+  return { scene, revision, file: { filename: file.filename, subfolder: file.subfolder || '', type: file.type || 'output' } };
+}
 export function checkpointMedia(checkpoint: Checkpoint, usePresentation = true): PreviewMedia {
   const replacement = usePresentation && checkpoint.presentation_video;
   const video = replacement || checkpoint.preview_video || checkpoint.video;
-  return { url: mediaUrl(video), name: checkpoint.scene_id, kind: 'video', scene: checkpoint.scene, sceneId: checkpoint.scene_id,
+  return { savedSource: savedFrameSource(video, checkpoint.scene, replacement ? checkpoint.presentation_revision || '' : checkpoint.revision), url: mediaUrl(video), name: checkpoint.scene_id, kind: 'video', scene: checkpoint.scene, sceneId: checkpoint.scene_id,
     // H3 review MP4s already include audio; raw and alternate pictures need a WAV.
     audioUrl: replacement || !checkpoint.preview_video ? mediaUrl(checkpoint.audio) : '' };
 }
@@ -43,7 +47,7 @@ export function revisionMedia(revision: Revision, revisions: Revision[], checkpo
   if (revision.take_kind !== 'editorial_alternate' && revision.alternate_media_mode !== 'picture_only') return checkpointMedia(revision, false);
   const base = revisions.find(item => item.scene === revision.scene && item.revision === revision.alternate_of_revision)
     || checkpoints.find(item => item.scene === revision.scene && item.revision === revision.alternate_of_revision);
-  return { url: mediaUrl(revision.video || revision.preview_video), audioUrl: mediaUrl(base?.audio || revision.audio), name: revision.scene_id, kind: 'video', scene: revision.scene, sceneId: revision.scene_id };
+  return { savedSource: savedFrameSource(revision.video || revision.preview_video, revision.scene, revision.revision), url: mediaUrl(revision.video || revision.preview_video), audioUrl: mediaUrl(base?.audio || revision.audio), name: revision.scene_id, kind: 'video', scene: revision.scene, sceneId: revision.scene_id };
 }
 export function playbackSegments(plan: Plan | null, inputs: Record<string, Value>, checkpoints: Checkpoint[], editorial?: Editorial | null): PlaybackSegment[] {
   let natural = 0, cursor = 0;

@@ -144,3 +144,8 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 .image-editor-actions { display:flex; flex-wrap:wrap; gap:8px; position:sticky; bottom:0; padding:10px 0; background:#1e2227; }
 .image-editor [role=alert] { color:#e8ae87; }
 @media(max-width:750px) { .image-editor { grid-template-columns:1fr; overflow:auto; } .image-editor-view,.image-editor-inspector { overflow:visible; } }
+
+.frame-capture { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr); gap: 20px; }
+.captured-frame { display: block; width: 100%; max-height: 52vh; object-fit: contain; background: #101214; }
+.frame-capture fieldset { min-width: 0; }
+@media (max-width: 700px) { .frame-capture { grid-template-columns: 1fr; } }

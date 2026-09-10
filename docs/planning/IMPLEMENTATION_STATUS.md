@@ -4,6 +4,19 @@ Active goal: implement [the complete roadmap](../WORKFLOW_PARITY_PLAN.md), prese
 
 Release convention requested by the user: continue the current work as **0.5.1, 0.5.2, ...**. Do not increment the minor version for each implementation batch.
 
+## 0.5.15: reviewed captures from saved scene clips
+
+The full M0–M8 goal remains active. This patch advances the saved-frame part of A05 while retaining patch-only releases.
+
+- **Edit → Viewer → Capture frame** pauses the actual displayed saved picture, snapshots its local video time and opens a picture preview with tag/folder controls. Gaps, unloaded/seeking/failed media and unsaved sources cannot capture. A final-cut alternate retains its own revision and file even when the base supplies audio. Native extraction excludes browser overlays/captions.
+- **Review frame → Save captured picture** requires `library_capture_version: 1` in updated draft [H3 PR #62](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/62), branch `sceneweaver-asset-library` at `ab7a510`. Native saved-revision/media validation, hashes, catalog review and project ownership protect a single catalog publication with numbered tag, folder, operation receipt and saved-clip/time provenance. Source video, cut and Plan are preserved.
+- Lost acknowledgements reconcile the exact operation. Prepared images survive server/parent restart and **Media → Resume frame capture** publishes the retained picture without extracting again. Changed destinations reject stale publication. Reviewed copies, image variants and captures now use consistent operation → ownership → catalog lock ordering, with ownership checked again at publication so a takeover during preparation can proceed and reject stale writes.
+- The bridge advertises capture independently from image-sizing helpers. Older native APIs show an unavailable state. Python changes require restarting ComfyUI, refreshing its tab and reopening SceneWeaver.
+
+Validation: the 0.5.15 build, 37 frontend + 147 adapter/proxy tests, and the complete 144-case browser suite passed. Six new browser cases cover local time after a gap, exact ALT identity, stale edits, lost acknowledgement, restarted-parent recovery, older H3 and the visually inspected 1280×720 dialog. Eight native temporary-video tests check actual two-color frame pixels, saved/review media identity, byte/metadata/catalog changes, numbered tags/provenance, single commit, ownership takeover, extraction failure, retained-stage recovery and committed-receipt replay. Existing copy/image/library/HTTP/store/manager checks and 16 legacy frame-capture tests passed. Browser media and HTTP fixtures remain synthetic; native tests use actual temporary files and CPU stubs.
+
+The production panel was checked again: no tabs are connected and the old `wf:a08e1` target is absent. No production graph/project was edited and no GPU job ran. A05 still needs isolated model upscale, source-viewer capture and representative production validation. Next, the isolated Carousel job must exclude reference-template ancestors from its submitted prompt and retain native job identity across uncertain queue acknowledgements. Other M0–M8 work remains open.
+
 ## 0.5.14: native picture variants in the Media source editor
 
 The full M0–M8 goal remains active. This patch advances A04 with the Resolve-inspired source-viewer/Inspector workflow and reviewed native crop/resize saves.

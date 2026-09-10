@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandReceipt, ComfyEvent, LiveResult, LiveSnapshot } from '../types';
 const PROTOCOL = 'sceneweaver.live.v1';
-const reads = new Set(['asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect', 'prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview', 'command-status']);
+const reads = new Set(['asset-frame-inspect', 'asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect', 'prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview', 'command-status']);
 
 export function useLiveWorkflow(target: string, connected: boolean) {
   const [params] = useState(() => new URLSearchParams(location.hash.slice(1)));
@@ -79,7 +79,7 @@ export function useLiveWorkflow(target: string, connected: boolean) {
         pending.current.delete(id);
         if (!reads.has(action)) setReceipts(current => current.map(item => item.id === id && ['pending', 'running'].includes(item.status) ? { ...item, status: 'uncertain', message: 'The action timed out. Check its receipt before submitting new work.' } : item));
         reject(new Error('ComfyUI did not return this action’s result. Check its receipt and refresh the workflow before submitting new work.'));
-      }, ['asset-upload', 'delivery-preview', 'editorial-inspect', 'editorial-preview'].includes(action) ? 300000 : 30000);
+      }, ['asset-frame-inspect', 'asset-library-mutate', 'asset-upload', 'delivery-preview', 'editorial-inspect', 'editorial-preview'].includes(action) ? 300000 : 30000);
       pending.current.set(id, { resolve, reject, timer, receipt });
       try { window.opener.postMessage({ protocol: PROTOCOL, session, kind: 'command', id, command: { ...options, action, binding: base.binding, revision: base.revision } }, origin); }
       catch (error) {

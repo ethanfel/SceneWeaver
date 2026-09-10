@@ -1,5 +1,5 @@
-const reads = new Set(['asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect', 'prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
-const concurrentReads = new Set(['snapshot', 'asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect']);
+const reads = new Set(['asset-frame-inspect', 'asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect', 'prompt-history-list', 'prompt-history-revision', 'snapshot', 'export', 'focus', 'prompt-tools', 'plan-edit', 'checkpoint-preview', 'delivery-preview', 'editorial-inspect', 'editorial-preview']);
+const concurrentReads = new Set(['snapshot', 'asset-frame-inspect', 'asset-image-inspect', 'asset-image-dimensions', 'asset-library-source', 'asset-library-copy-preview', 'asset-library-inspect']);
 
 // Receipts live in the parent tab, so a companion refresh can recover the
 // outcome without replaying a mutation. They are not durable H3 job records.

@@ -19,7 +19,7 @@ export function assetLibraryFixture() {
   };
   reset();
   const operations = () => Object.values(pending).map(request => ({ operation_id: request.operation_id, action: request.action, asset_id: request.asset_id, phase: 'prepared' }));
-  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_copy_version: 1, library_image_version: 1, library_pending_operations: operations(), library_pending_copies: operations().filter(item => item.action === 'asset_copy'), library_revision: hash(catalog) }) });
+  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_copy_version: 1, library_image_version: 1, library_capture_version: 1, library_pending_operations: operations(), library_pending_copies: operations().filter(item => item.action === 'asset_copy'), library_revision: hash(catalog) }) });
   const imageReview = (assetId, edit) => {
     const asset = catalog.assets.find(item => item.id === assetId);
     if (!asset || asset.kind !== 'image') return { error: 'Source image is unavailable.' };
@@ -37,9 +37,15 @@ export function assetLibraryFixture() {
     return { project: catalog.project, source_project: source, asset_id: assetId, base_revision: hash(catalog), enabled, folder_id: folder,
       preview_revision: hash([catalog, sources[source], assetId, enabled, folder]).repeat(2), assets: sources[source].assets.filter(item => ids.has(item.id)), copyable, issue: copyable ? '' : 'The destination already has an enabled Source track. Copy this one disabled.' };
   };
+  const frameReview = selection => {
+    if (!selection.source?.file?.filename || !/^[0-9a-f]{32}$/.test(selection.source.revision) || !Number.isFinite(selection.time_seconds) || selection.time_seconds < 0 || selection.time_seconds >= 4.5) return { error: 'Choose a frame inside a saved clip.' };
+    if (selection.folder_id && !catalog.folders.some(item => item.id === selection.folder_id)) return { error: 'Capture folder is unavailable.' };
+    return { project: catalog.project, ...selection, base_revision: hash(catalog), preview_revision: hash([catalog, selection]).repeat(2), copyable: true, issue: '' };
+  };
   async function handle(path, options = {}) {
     const url = new URL(path, 'http://fixture');
     if (!options.body) {
+      if (url.searchParams.has('capture_frame')) { const value = frameReview(JSON.parse(url.searchParams.get('capture_frame'))); return Response.json(value, { status: value.error ? 400 : 200 }); }
       if (url.searchParams.has('image_asset')) { const value = imageReview(url.searchParams.get('image_asset'), url.searchParams.has('image_edit') ? JSON.parse(url.searchParams.get('image_edit')) : null); return Response.json(value, { status: value.error ? 400 : 200 }); }
       if (url.pathname.endsWith('/projects')) return Response.json({ items: [catalog, ...Object.values(sources)].map(item => ({ project: item.project, asset_count: item.assets.length })) });
       if (url.searchParams.has('copy_source')) return Response.json(review(url.searchParams.get('copy_source'), url.searchParams.get('copy_asset'), url.searchParams.get('enabled') === 'true', url.searchParams.get('folder_id') || ''));
@@ -53,7 +59,7 @@ export function assetLibraryFixture() {
     if (saved) return saved.fingerprint === hash(body) ? Response.json({ catalog: listing(), receipt: saved.receipt, replayed: true }) : Response.json({ error: 'Changed operation' }, { status: 400 });
     if (legacy || body.command_version !== 1) return Response.json({ error: 'Unsupported library command' }, { status: 400 });
     if (body.project !== catalog.project || body.base_revision !== listing().library_revision) return Response.json({ error: 'The library changed. Refresh and review.' }, { status: 409 });
-    if (['asset_copy', 'asset_derive'].includes(body.action) && failure === 'prepared') { pending[body.operation_id] = structuredClone(body); failure = ''; throw new Error('Interrupted prepared media'); }
+    if (['asset_copy', 'asset_derive', 'asset_capture'].includes(body.action) && failure === 'prepared') { pending[body.operation_id] = structuredClone(body); failure = ''; throw new Error('Interrupted prepared media'); }
     const asset = catalog.assets.find(item => item.id === body.asset_id), folder = catalog.folders.find(item => item.id === body.folder_id);
     const beforeAssets = catalog.assets.map(item => item.id), beforeFolders = catalog.folders.map(item => item.id);
     const reorder = (values, ids) => {
@@ -61,7 +67,14 @@ export function assetLibraryFixture() {
       return ids.map(id => values.find(item => item.id === id));
     };
     try {
-      if (body.action === 'asset_derive') {
+      if (body.action === 'asset_capture') {
+        const selection = Object.fromEntries(['source', 'time_seconds', 'tag', 'folder_id'].map(key => [key, body[key]])), value = frameReview(selection);
+        if (value.error || value.preview_revision !== body.preview_revision) return Response.json({ error: value.error || 'Saved source changed after review.' }, { status: 409 });
+        catalog.assets.push({ id: id('capture'), tag: body.tag, kind: 'image', role: 'picture', enabled: true, folder_id: body.folder_id, original_name: 'frame_capture.png', relative_path: `images/${body.operation_id}.png`, source_kind: 'frame_capture',
+          source_origin: { project: catalog.project, kind: 'saved_frame', ...body.source, time_seconds: body.time_seconds } });
+        delete pending[body.operation_id];
+      }
+      else if (body.action === 'asset_derive') {
         const edit = Object.fromEntries(['crop', 'target', 'resample', 'tag', 'folder_id'].map(key => [key, body[key]])), value = imageReview(body.asset_id, edit);
         if (value.error || value.preview_revision !== body.preview_revision) return Response.json({ error: value.error || 'Image source changed after review.' }, { status: 409 });
         catalog.assets.push({ ...structuredClone(asset), id: id('image'), tag: body.tag || `${asset.tag}_variant`, parent_asset_id: asset.id, source_kind: 'derived_image', enabled: true, folder_id: body.folder_id,

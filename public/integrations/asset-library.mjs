@@ -1,5 +1,5 @@
 const endpoint = '/minimax_h3_context_loop/project-assets';
-const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder', 'asset_copy', 'asset_derive']);
+const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder', 'asset_copy', 'asset_derive', 'asset_capture']);
 
 export function createAssetLibrary({ api, verify, write, imageSizing }) {
   const retained = new Map();
@@ -59,6 +59,19 @@ export function createAssetLibrary({ api, verify, write, imageSizing }) {
     if (value.project !== command.project || value.asset_id !== command.asset_id || value.asset?.id !== command.asset_id || !Number.isInteger(value.source?.width) || !Number.isInteger(value.source?.height) || value.source.width < 1 || value.source.height < 1 || !Array.isArray(value.resampling) || command.edit && !/^[0-9a-f]{64}$/.test(value.preview_revision || '')) throw new Error('H3 returned an image review for an unexpected source.');
     return value;
   }
+  async function inspectFrame(command) {
+    verify(command);
+    const capture = { source: command.source, time_seconds: command.time_seconds, tag: command.tag, folder_id: command.folder_id || '' };
+    const response = await api.fetchApi(`${endpoint}?${new URLSearchParams({ project: command.project, create: 'false', capture_frame: JSON.stringify(capture) })}`);
+    const value = await response.json(); verify(command);
+    if (!response.ok) throw new Error(value.error || 'Cannot review this saved frame.');
+    const source = value.source, expected = command.source;
+    if (value.project !== command.project || value.time_seconds !== command.time_seconds || value.folder_id !== capture.folder_id ||
+        !source || !expected || ['scene', 'revision', 'branch_id'].some(key => source[key] !== expected[key]) ||
+        ['filename', 'subfolder', 'type'].some(key => source.file?.[key] !== expected.file?.[key]) ||
+        !/^[0-9a-f]{64}$/.test(value.preview_revision || '')) throw new Error('H3 returned a frame review for an unexpected source.');
+    return value;
+  }
   function dimensions(command) {
     verify(command);
     if (!imageSizing) throw new Error('The installed H3 image-sizing helpers are unavailable.');
@@ -81,7 +94,7 @@ export function createAssetLibrary({ api, verify, write, imageSizing }) {
         validate(status.catalog, command);
         const recovered = (status.pending_operation || status.pending_copy)?.request;
         if (status.receipt?.operation_id === command.operation_id && status.receipt.project === command.project) return { data: present(status.catalog, command) };
-        if (!recovered || recovered.project !== command.project || recovered.operation_id !== command.operation_id || !['asset_copy', ...(command.resume_operation ? ['asset_derive'] : [])].includes(recovered.action) || recovered.command_version !== 1) throw new Error('No matching recoverable media operation was found in H3.');
+        if (!recovered || recovered.project !== command.project || recovered.operation_id !== command.operation_id || !['asset_copy', ...(command.resume_operation ? ['asset_derive', 'asset_capture'] : [])].includes(recovered.action) || recovered.command_version !== 1) throw new Error('No matching recoverable media operation was found in H3.');
         body = recovered; retained.set(key(command), body);
       }
       if (!body || body.operation_id !== command.operation_id) throw new Error('No matching library request is retained in this ComfyUI tab.');
@@ -93,7 +106,8 @@ export function createAssetLibrary({ api, verify, write, imageSizing }) {
       if (!actions.has(command.library_action)) throw new Error('Unsupported library action.');
       if (command.library_action === 'asset_copy' && catalog.library_copy_version !== 1) throw new Error('Update H3 to enable reviewed project copies.');
       if (command.library_action === 'asset_derive' && catalog.library_image_version !== 1) throw new Error('Update H3 to enable reviewed image variants.');
-      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids', 'source_project', 'enabled', 'preview_revision', 'crop', 'target', 'resample'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
+      if (command.library_action === 'asset_capture' && catalog.library_capture_version !== 1) throw new Error('Update H3 to enable reviewed frame captures.');
+      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids', 'source_project', 'enabled', 'preview_revision', 'crop', 'target', 'resample', 'source', 'time_seconds'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
       body = { command_version: 1, project: command.project, action: command.library_action,
         operation_id: crypto.randomUUID().replaceAll('-', ''), base_revision: catalog.library_revision, ...fields };
       retained.set(key(command), body);
@@ -109,5 +123,5 @@ export function createAssetLibrary({ api, verify, write, imageSizing }) {
       throw error;
     }
   }
-  return { inspect, mutate, source, preview, inspectImage, dimensions };
+  return { inspect, mutate, source, preview, inspectImage, inspectFrame, dimensions };
 }
