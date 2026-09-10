@@ -2,11 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { discoverH3 } from '../public/integrations/h3-discovery.mjs';
 import * as planCore from '../e2e/fixtures/h3-native/h3_chain_plan_core.mjs';
+import * as imageCore from '../e2e/fixtures/h3-native/h3_project_asset_editor_core.mjs';
 
 const origin = 'http://comfy.test';
 const assetPath = '/extensions/h3/h3_project_asset_manager.js';
 const studioPath = '/extensions/h3/h3_chain_plan_studio.js';
 const imports = `import './h3_project_ownership.mjs?v=not-a-release'; import './h3_project_asset_editor_core.mjs'; import './h3_project_asset_sync_core.mjs';`;
+test('native image sizing discovery is independent of audio binding support', async () => {
+  const env = environment({ exports: { ...imageCore, projectAudioTrackBindings: undefined } });
+  const result = await discoverH3(env.api, env.options);
+  assert.equal(result.audioTracks, undefined); assert.equal(result.imageSizing.dimensionsForMegapixels, imageCore.dimensionsForMegapixels);
+});
 test('scene authoring requires native function and limit exports independently of project writes', async () => {
   const env = environment({ sources: { [studioPath]: `import './h3_chain_plan_core.mjs?v=installed';` }, exports: planCore });
   const supported = await discoverH3(env.api, env.options);

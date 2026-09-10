@@ -4,6 +4,20 @@ Active goal: implement [the complete roadmap](../WORKFLOW_PARITY_PLAN.md), prese
 
 Release convention requested by the user: continue the current work as **0.5.1, 0.5.2, ...**. Do not increment the minor version for each implementation batch.
 
+## 0.5.14: native picture variants in the Media source editor
+
+The full M0–M8 goal remains active. This patch advances A04 with the Resolve-inspired source-viewer/Inspector workflow and reviewed native crop/resize saves.
+
+- **Media → Edit image** reads the oriented source geometry, shows an interactive crop and a framing preview, and exposes source-pixel X/Y/width/height, output dimensions, megapixels, aspect lock, output multiples, resampling, tag and folder. Drawing, moving, corner resizing and arrow/Shift-arrow nudging retain keyboard focus. Full-image and reset controls preserve the native sizing rules.
+- Sizing imports H3's installed `dimensionsForMegapixels` and `coupledOutputDimensions` helpers, independently of optional audio-binding support. The backend owns EXIF orientation, crop bounds, resampling and target limits. The displayed framing preview does not claim to reproduce the final filter.
+- **Review variant → Save variant** uses the `library_image_version: 1` API in updated draft [H3 PR #62](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/62), branch `sceneweaver-asset-library` at `dcd056f`. Native ownership and source/catalog review guards protect publication. The existing native derive/register methods run against frozen source bytes in a private store; the enabled derived card, parent/transform provenance and receipt enter the destination catalog in one commit. The source bytes, source card and Plan remain unchanged.
+- `library_pending_operations` distinguishes image variants from project copies. Prepared variants survive restart and can be resumed from Media with their exact request. Existing copy recovery fields remain compatible. Completed status reads clean residual staging; media admission now checks the shared 1,024-operation limit before creating another directory, while committed receipts remain replayable.
+- Missing native helper/API support disables image editing. Updating the Python routes requires restarting ComfyUI, then refreshing its browser tab and reopening SceneWeaver. Model upscale and saved-review-frame capture remain in A05.
+
+Validation: the 0.5.14 build, all 37 frontend + 143 adapter/proxy tests, and the complete 138-case browser suite passed. Seven new image-editor browser cases passed after correcting modal focus retention, covering crop drawing/move/resize/nudging, native sizing, review/save/provenance, stale and late reviews, restart recovery, older H3 and the 1280×720 layout. Native temp-file tests verify actual selected pixels and alpha, EXIF geometry, one catalog commit, provenance, source immutability, invalid/stale requests, interruption/replay, route ownership and operation admission. Existing copy/library/store checks passed. The native image-sizing fixture was verified byte-for-byte against nightly `326453d71065f8031c160ea4d504678dab3e0cc1`; HTTP/storage fixtures remain synthetic.
+
+The production panel still has no connected tabs and the old `wf:a08e1` target is absent. This does not prove server unavailability; no production project was changed or GPU workflow executed. A04/M2 still require representative production validation, and the remaining M0–M8 items remain open.
+
 ## 0.5.13: reviewed imports from other H3 projects
 
 The full M0–M8 goal remains active. This patch advances A01–A03 with a Media source browser and recoverable grouped imports, while retaining the 0.5.x release convention.

@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.13** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.14** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -70,6 +70,10 @@ In **0.5.2**, scene editing follows the Plan's effective text source. Supported 
 In **0.5.3**, **Branches** opens the native branch manager: save authoring, save and switch, open saved settings while retaining native recovery drafts, create an empty branch or fork through the selected scene, reload, recover, retry a pending operation, and change the project default. These actions require the H3 browser interface proposed in [H3 PR #57](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/57), currently on `sceneweaver-branch-controls`. Existing main/nightly installations keep branch following and show why commands are unavailable. The interface must be installed and the ComfyUI tab refreshed; a SceneWeaver update alone cannot add it.
 
 ## September 2026 H3 compatibility update
+
+In **0.5.14**, **Media → Edit image** opens a source viewer and Inspector for picture variants. Draw, move or resize a crop; nudge it with arrow keys; set exact crop placement, output dimensions or megapixels; lock aspect ratio, choose an output multiple, select resampling, and choose a tag/folder. **Review variant → Save variant** creates an enabled derived image with native parent/transform provenance. The source and Plan stay unchanged. The framing preview shows the crop; H3 performs final resampling.
+
+Saving requires the image-variant API in updated draft [H3 PR #62](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/62). Native geometry and sizing helpers remain authoritative, and stale reviews are rejected. **Resume image variant** recovers prepared work after reopening ComfyUI. Unsupported image controls stay disabled. After updating the native pack, restart ComfyUI, refresh its browser tab, and reopen SceneWeaver. Model-based upscale and saved-frame capture remain on the roadmap.
 
 In **0.5.13**, **Media → Other projects** browses existing H3 libraries and previews original media. Select an asset, choose its destination folder and enabled state, then review the copy. Grouped soundtracks include their stems with new IDs and remapped track links. A second Source track defaults disabled. H3 retains source and derived provenance, and the source project and Plan text remain unchanged.
 

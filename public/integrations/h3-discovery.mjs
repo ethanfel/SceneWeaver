@@ -69,6 +69,10 @@ export async function discoverH3(api, options = {}) {
       const value = await module(assets.value, 'h3_project_asset_editor_core.mjs');
       if (!functions(value, ['projectAudioTrackBindings'])) throw new Error(); adapters.audioTracks = value;
     });
+    await probe('imageSizing', 'Native megapixel, aspect-ratio and output-multiple sizing available.', async () => {
+      const value = await module(assets.value, 'h3_project_asset_editor_core.mjs');
+      if (!functions(value, ['dimensionsForMegapixels', 'coupledOutputDimensions'])) throw new Error(); adapters.imageSizing = value;
+    });
   } else check('assets', 'unavailable', 'The H3 Asset Carousel extension could not be read.');
   await probe('promptHistory', 'Native prompt revision tree available; history write support is checked with the server.', async () => {
     const editor = await entry('h3_chain_scene_prompt_editor.js');

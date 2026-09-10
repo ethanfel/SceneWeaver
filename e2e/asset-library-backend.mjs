@@ -18,7 +18,17 @@ export function assetLibraryFixture() {
     ] }, empty_source: { project: 'empty_source', folders: [], assets: [] } };
   };
   reset();
-  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_copy_version: 1, library_pending_copies: Object.values(pending).map(request => ({ operation_id: request.operation_id, action: 'asset_copy', phase: 'prepared' })), library_revision: hash(catalog) }) });
+  const operations = () => Object.values(pending).map(request => ({ operation_id: request.operation_id, action: request.action, asset_id: request.asset_id, phase: 'prepared' }));
+  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_copy_version: 1, library_image_version: 1, library_pending_operations: operations(), library_pending_copies: operations().filter(item => item.action === 'asset_copy'), library_revision: hash(catalog) }) });
+  const imageReview = (assetId, edit) => {
+    const asset = catalog.assets.find(item => item.id === assetId);
+    if (!asset || asset.kind !== 'image') return { error: 'Source image is unavailable.' };
+    const info = { project: catalog.project, asset_id: assetId, asset, base_revision: hash(catalog), source: { width: 240, height: 160 }, max_pixels: 268435456, resampling: ['lanczos', 'bicubic', 'bilinear', 'nearest', 'box', 'hamming'] };
+    if (!edit) return info;
+    const { crop, target } = edit;
+    if (!crop || !target || ![crop.x, crop.y, crop.width, crop.height, target.width, target.height].every(Number.isInteger) || crop.x < 0 || crop.y < 0 || crop.width < 1 || crop.height < 1 || crop.x + crop.width > 240 || crop.y + crop.height > 160 || target.width < 1 || target.height < 1 || target.width * target.height > info.max_pixels) return { error: 'Crop or output dimensions exceed the native image bounds.' };
+    return { ...info, ...edit, preview_revision: hash([info, edit]).repeat(2), copyable: true, issue: '' };
+  };
   const review = (source, assetId, enabled, folder) => {
     const root = sources[source]?.assets.find(item => item.id === assetId);
     if (!root) return { error: 'Source asset is missing.' };
@@ -30,10 +40,11 @@ export function assetLibraryFixture() {
   async function handle(path, options = {}) {
     const url = new URL(path, 'http://fixture');
     if (!options.body) {
+      if (url.searchParams.has('image_asset')) { const value = imageReview(url.searchParams.get('image_asset'), url.searchParams.has('image_edit') ? JSON.parse(url.searchParams.get('image_edit')) : null); return Response.json(value, { status: value.error ? 400 : 200 }); }
       if (url.pathname.endsWith('/projects')) return Response.json({ items: [catalog, ...Object.values(sources)].map(item => ({ project: item.project, asset_count: item.assets.length })) });
       if (url.searchParams.has('copy_source')) return Response.json(review(url.searchParams.get('copy_source'), url.searchParams.get('copy_asset'), url.searchParams.get('enabled') === 'true', url.searchParams.get('folder_id') || ''));
       if (sources[url.searchParams.get('project')]) return Response.json(sources[url.searchParams.get('project')]);
-      const operation = url.searchParams.get('operation_id'); return Response.json(operation ? { catalog: listing(), receipt: receipts[operation]?.receipt || null, pending_copy: pending[operation] ? { request: pending[operation], phase: 'prepared' } : null } : listing());
+      const operation = url.searchParams.get('operation_id'); return Response.json(operation ? { catalog: listing(), receipt: receipts[operation]?.receipt || null, pending_operation: pending[operation] ? { request: pending[operation], phase: 'prepared' } : null, pending_copy: pending[operation]?.action === 'asset_copy' ? { request: pending[operation], phase: 'prepared' } : null } : listing());
     }
     const body = JSON.parse(options.body);
     if (failure === 'before') { failure = ''; throw new Error('Dropped library request'); }
@@ -42,7 +53,7 @@ export function assetLibraryFixture() {
     if (saved) return saved.fingerprint === hash(body) ? Response.json({ catalog: listing(), receipt: saved.receipt, replayed: true }) : Response.json({ error: 'Changed operation' }, { status: 400 });
     if (legacy || body.command_version !== 1) return Response.json({ error: 'Unsupported library command' }, { status: 400 });
     if (body.project !== catalog.project || body.base_revision !== listing().library_revision) return Response.json({ error: 'The library changed. Refresh and review.' }, { status: 409 });
-    if (body.action === 'asset_copy' && failure === 'prepared') { pending[body.operation_id] = structuredClone(body); failure = ''; throw new Error('Interrupted prepared copy'); }
+    if (['asset_copy', 'asset_derive'].includes(body.action) && failure === 'prepared') { pending[body.operation_id] = structuredClone(body); failure = ''; throw new Error('Interrupted prepared media'); }
     const asset = catalog.assets.find(item => item.id === body.asset_id), folder = catalog.folders.find(item => item.id === body.folder_id);
     const beforeAssets = catalog.assets.map(item => item.id), beforeFolders = catalog.folders.map(item => item.id);
     const reorder = (values, ids) => {
@@ -50,7 +61,14 @@ export function assetLibraryFixture() {
       return ids.map(id => values.find(item => item.id === id));
     };
     try {
-      if (body.action === 'asset_copy') {
+      if (body.action === 'asset_derive') {
+        const edit = Object.fromEntries(['crop', 'target', 'resample', 'tag', 'folder_id'].map(key => [key, body[key]])), value = imageReview(body.asset_id, edit);
+        if (value.error || value.preview_revision !== body.preview_revision) return Response.json({ error: value.error || 'Image source changed after review.' }, { status: 409 });
+        catalog.assets.push({ ...structuredClone(asset), id: id('image'), tag: body.tag || `${asset.tag}_variant`, parent_asset_id: asset.id, source_kind: 'derived_image', enabled: true, folder_id: body.folder_id,
+          metadata: { ...body.target }, relative_path: `images/${body.operation_id}.png`, transform: { kind: 'crop_resize', crop: body.crop, target: body.target, resample: body.resample, source: value.source, operation_id: body.operation_id } });
+        delete pending[body.operation_id];
+      }
+      else if (body.action === 'asset_copy') {
         const preview = review(body.source_project, body.asset_id, body.enabled, body.folder_id);
         if (!preview.copyable || preview.preview_revision !== body.preview_revision) return Response.json({ error: preview.issue || 'Source changed after review.' }, { status: 409 });
         const mapped = Object.fromEntries(preview.assets.map(item => [item.id, id('copy')]));

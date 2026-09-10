@@ -1,7 +1,7 @@
 const endpoint = '/minimax_h3_context_loop/project-assets';
-const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder', 'asset_copy']);
+const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder', 'asset_copy', 'asset_derive']);
 
-export function createAssetLibrary({ api, verify, write }) {
+export function createAssetLibrary({ api, verify, write, imageSizing }) {
   const retained = new Map();
   const key = command => JSON.stringify([command.binding, command.node, command.project]);
   const validate = (catalog, command) => {
@@ -51,16 +51,37 @@ export function createAssetLibrary({ api, verify, write }) {
     if (value.project !== command.project || value.source_project !== command.source_project || value.asset_id !== command.asset_id || value.enabled !== command.enabled || value.folder_id !== (command.folder_id || '') || !Array.isArray(value.assets) || !/^[0-9a-f]{64}$/.test(value.preview_revision || '')) throw new Error('H3 returned a copy preview for an unexpected selection.');
     return value;
   }
+  async function inspectImage(command) {
+    verify(command);
+    const response = await api.fetchApi(`${endpoint}?${new URLSearchParams({ project: command.project, create: 'false', image_asset: command.asset_id, ...(command.edit ? { image_edit: JSON.stringify(command.edit) } : {}) })}`);
+    const value = await response.json(); verify(command);
+    if (!response.ok) throw new Error(value.error || 'Cannot inspect this image.');
+    if (value.project !== command.project || value.asset_id !== command.asset_id || value.asset?.id !== command.asset_id || !Number.isInteger(value.source?.width) || !Number.isInteger(value.source?.height) || value.source.width < 1 || value.source.height < 1 || !Array.isArray(value.resampling) || command.edit && !/^[0-9a-f]{64}$/.test(value.preview_revision || '')) throw new Error('H3 returned an image review for an unexpected source.');
+    return value;
+  }
+  function dimensions(command) {
+    verify(command);
+    if (!imageSizing) throw new Error('The installed H3 image-sizing helpers are unavailable.');
+    const value = command.size;
+    if (!value || ![1, 8, 16, 32, 64].includes(value.multiple) || !Number.isFinite(value.ratio) || value.ratio <= 0 || ![value.width, value.height, value.megapixels].filter(item => item !== undefined).every(item => Number.isFinite(item) && item > 0)) throw new Error('Image size and aspect ratio must be positive.');
+    if (value.mode === 'megapixels') {
+      if (!(Number.isFinite(value.megapixels) && value.megapixels > 0)) throw new Error('Target megapixels must be positive.');
+      return imageSizing.dimensionsForMegapixels(value.megapixels, value.ratio, value.multiple);
+    }
+    if (![value.width, value.height].every(item => Number.isFinite(item) && item > 0)) throw new Error('Output dimensions must be positive.');
+    if (!['width', 'height'].includes(value.changed)) throw new Error('Choose the dimension to update.');
+    return imageSizing.coupledOutputDimensions(value.width, value.height, value.changed, value.ratio, value.locked === true, value.multiple);
+  }
   async function mutate(command) {
     verify(command);
     let body = retained.get(key(command));
     if (command.retry) {
-      if (!body && command.resume_copy) {
+      if (!body && (command.resume_copy || command.resume_operation)) {
         const status = await read(command, command.operation_id);
         validate(status.catalog, command);
-        const recovered = status.pending_copy?.request;
+        const recovered = (status.pending_operation || status.pending_copy)?.request;
         if (status.receipt?.operation_id === command.operation_id && status.receipt.project === command.project) return { data: present(status.catalog, command) };
-        if (!recovered || recovered.project !== command.project || recovered.operation_id !== command.operation_id || recovered.action !== 'asset_copy' || recovered.command_version !== 1) throw new Error('No matching recoverable copy was found in H3.');
+        if (!recovered || recovered.project !== command.project || recovered.operation_id !== command.operation_id || !['asset_copy', ...(command.resume_operation ? ['asset_derive'] : [])].includes(recovered.action) || recovered.command_version !== 1) throw new Error('No matching recoverable media operation was found in H3.');
         body = recovered; retained.set(key(command), body);
       }
       if (!body || body.operation_id !== command.operation_id) throw new Error('No matching library request is retained in this ComfyUI tab.');
@@ -71,7 +92,8 @@ export function createAssetLibrary({ api, verify, write }) {
       if (catalog.library_revision !== command.base_revision) throw new Error('The library changed. Refresh and review before applying.');
       if (!actions.has(command.library_action)) throw new Error('Unsupported library action.');
       if (command.library_action === 'asset_copy' && catalog.library_copy_version !== 1) throw new Error('Update H3 to enable reviewed project copies.');
-      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids', 'source_project', 'enabled', 'preview_revision'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
+      if (command.library_action === 'asset_derive' && catalog.library_image_version !== 1) throw new Error('Update H3 to enable reviewed image variants.');
+      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids', 'source_project', 'enabled', 'preview_revision', 'crop', 'target', 'resample'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
       body = { command_version: 1, project: command.project, action: command.library_action,
         operation_id: crypto.randomUUID().replaceAll('-', ''), base_revision: catalog.library_revision, ...fields };
       retained.set(key(command), body);
@@ -87,5 +109,5 @@ export function createAssetLibrary({ api, verify, write }) {
       throw error;
     }
   }
-  return { inspect, mutate, source, preview };
+  return { inspect, mutate, source, preview, inspectImage, dimensions };
 }

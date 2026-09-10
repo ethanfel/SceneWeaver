@@ -22,8 +22,9 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false, promptTools, promptHistory } = {}) {
-  const library = createAssetLibrary({ api, verify: projectNode, write: projectRequest });
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, imageSizing: nativeImageSizing, diagnostics, generationHooks, delivery, editorial, planAuthoring, planSettings = false, promptTools, promptHistory } = {}) {
+  const imageSizing = ['dimensionsForMegapixels', 'coupledOutputDimensions'].every(name => typeof nativeImageSizing?.[name] === 'function') ? nativeImageSizing : null;
+  const library = createAssetLibrary({ api, verify: projectNode, write: projectRequest, imageSizing });
   const history = typeof promptHistory?.promptRevisionTree === 'function' && typeof planAuthoring?.parsePlanJson === 'function' && typeof planAuthoring?.safeShotId === 'function' && createPromptHistory({ api, native: promptHistory, verify: command => {
     projectPlan(command);
     const current = snapshot(), source = resolvePlanDocument(current.nodes, command.plan);
@@ -107,7 +108,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     let generationReason = '';
     try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
     const canSubmit = !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function';
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, assetLibraryVersion: 1, assetLibraryCopyVersion: 1, promptHistoryVersion: history && planAuthoring ? 1 : 0, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, promptToolsVersion: promptTools && typeof planAuthoring?.promptTextToLines === 'function' && typeof planAuthoring?.sharedPrompt === 'function' ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, assetLibraryVersion: 1, assetLibraryCopyVersion: 1, assetImageVersion: imageSizing ? 1 : 0, promptHistoryVersion: history && planAuthoring ? 1 : 0, planSourceVersion: 1, planAuthoringVersion: planAuthoring ? 1 : 0, planSettingsVersion: planSettings ? 1 : 0, promptToolsVersion: promptTools && typeof planAuthoring?.promptTextToLines === 'function' && typeof planAuthoring?.sharedPrompt === 'function' ? 1 : 0, editorialVersion: editorial ? 1 : 0, deliveryVersion: canSubmit && delivery ? 1 : 0, generationReason, generationVersion: canSubmit ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -197,6 +198,8 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       if (command.action === 'asset-library-inspect') return { data: await library.inspect(command) };
       if (command.action === 'asset-library-source') return { data: await library.source(command) };
       if (command.action === 'asset-library-copy-preview') return { data: await library.preview(command) };
+      if (command.action === 'asset-image-inspect') return { data: await library.inspectImage(command) };
+      if (command.action === 'asset-image-dimensions') return { data: library.dimensions(command) };
       if (command.action === 'asset-library-mutate') return library.mutate(command);
       if (['prompt-history-list', 'prompt-history-revision', 'prompt-history-mutate'].includes(command.action)) {
         if (!history) throw new Error('The native H3 prompt history helper is unavailable.');
