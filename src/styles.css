@@ -79,3 +79,7 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 .chapter-marker { margin: 14px 0; }
 .chapter-marker summary { font-size: 11px; color: #b8c1cc; overflow-wrap: anywhere; padding: 8px 0; }
 .chapter-marker .scene-actions { flex-wrap: wrap; margin-top: 8px; }
+
+.scene-generation-settings .prompt-alternatives, .scene-generation-settings .seed-reroll, .plan-defaults, .plan-canvas { margin: 12px 0; }
+.scene-generation-settings summary, .plan-defaults summary, .plan-canvas summary { padding: 8px 0; font-size: 11px; color: #b8c1cc; }
+.scene-generation-settings .scene-actions { flex-wrap: wrap; }

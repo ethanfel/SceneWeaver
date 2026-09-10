@@ -11,11 +11,20 @@ test('scene authoring requires native function and limit exports independently o
   const env = environment({ sources: { [studioPath]: `import './h3_chain_plan_core.mjs?v=installed';` }, exports: planCore });
   const supported = await discoverH3(env.api, env.options);
   assert.equal(supported.planAuthoring.renamePlanShot, planCore.renamePlanShot);
+  assert.equal(supported.planSettings, true);
+  assert.equal(supported.diagnostics.checks.find(item => item.id === 'durationRounding').status, 'unavailable');
   assert.equal(supported.diagnostics.checks.find(item => item.id === 'planAuthoring').status, 'available');
   const importModule = env.options.importModule;
   env.options.importModule = async url => ({ ...await importModule(url), duplicateShot: undefined });
   const missing = await discoverH3(env.api, env.options);
   assert.equal(missing.planAuthoring, undefined); assert.equal(typeof missing.ownershipOptions, 'function');
+});
+
+test('missing advanced setting exports leave scene structure available', async () => {
+  const env = environment({ sources: { [studioPath]: `import './h3_chain_plan_core.mjs';` }, exports: { ...planCore, normalizeChapterResolution: undefined } });
+  const result = await discoverH3(env.api, env.options);
+  assert.equal(typeof result.planAuthoring.renamePlanShot, 'function'); assert.equal(result.planSettings, undefined);
+  assert.equal(result.diagnostics.checks.find(item => item.id === 'planSettings').status, 'unavailable');
 });
 function environment(overrides = {}) {
   const sources = { [assetPath]: imports, [studioPath]: `import './h3_working_branches.mjs'; working_branch_id; base_revision: '/minimax_h3_context_loop/editorial'`, ...overrides.sources };

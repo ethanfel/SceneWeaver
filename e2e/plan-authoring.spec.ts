@@ -56,9 +56,9 @@ test('chapter markers and notes use native draft edits without removing their sc
   const companion = await attach(page);
   await companion.getByLabel('Chapter title').fill('Act one'); await companion.getByLabel('Chapter notes').fill('Updated notes');
   await companion.getByRole('button', { name: 'Stage chapter', exact: true }).click();
-  await expect(companion.locator('.chapter-marker summary')).toHaveText('Chapter · Act one');
+  await expect(companion.locator('.chapter-marker > details > summary')).toHaveText('Chapter · Act one');
   await companion.getByRole('button', { name: 'Remove marker', exact: true }).click();
-  await companion.locator('.chapter-marker summary').click();
+  await companion.locator('.chapter-marker > details > summary').click();
   await companion.getByRole('button', { name: 'Start chapter here', exact: true }).click();
   await expect(companion.getByLabel('Chapter title')).toHaveValue('Chapter 1');
   await companion.getByRole('button', { name: 'Apply to ComfyUI', exact: true }).click();

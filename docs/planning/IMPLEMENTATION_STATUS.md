@@ -4,6 +4,22 @@ Active goal: implement [the complete roadmap](../WORKFLOW_PARITY_PLAN.md), prese
 
 Release convention requested by the user: continue the current work as **0.5.1, 0.5.2, ...**. Do not increment the minor version for each implementation batch.
 
+## 0.5.9: inherited settings, seed domains and chapter geometry
+
+- Native settings exports are detected independently of structural authoring. The Inspector stages requested seconds, exact raw frames or inherited duration; blank steps and generation seeds restore inheritance. Prompt-alternative seeds have separate stable-derived, fixed and random-per-queue modes. New generation/prompt seeds call H3's secure generator without crossing seed domains.
+- Plan JSON duration/step defaults can be changed or cleared back to node inputs. Unknown defaults and scene metadata survive. Shared direction uses H3's existing `prompt_prefix` or legacy `global_prompt` key and retains blank paragraphs.
+- Chapter markers can be reassigned to a scene, with native rejection of occupied boundaries. Width and height are validated by the native chapter normalizer, or removed to inherit the Plan canvas. Reassigning the marker selects its new scene. Node canvas, base seed and default widgets are exposed separately; connected inputs lead to the existing source node rather than editing the fallback widget.
+- Settings use the source-aware draft/apply flow and keep unstaged values after a validation rejection. Settings-only commands do not explicitly reset selection or the playhead when the selected scene is unchanged. Browser recovery covers the staged Plan, not unsubmitted text in local form controls.
+- SceneWeaver's raw-frame estimate now respects Python's floating-point tolerance and ignores unsupported `defaults.length` / `defaults.frames` aliases. Invalid non-positive inherited/requested durations are reported. The UI distinguishes raw frames from saved-cut/delivered duration.
+
+The audit found an upstream JavaScript remainder bug: requests such as 1, 6 and 12 seconds rounded down in H3's browser core while Python rounded up. Draft [H3 PR #60](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/60), head `7821d1f40a76ec8e3ec125b2c10287790d1d089c`, corrects that helper and refreshes its import cache keys. Its regression compares 7,829 requests against the actual Python helper and six compiled Plans against browser timing. It also checks seconds-to-exact-frame conversion and confirms no project-file writes. The Plan editor, Studio, scene-duplication and chapter-resolution JavaScript regressions pass. PR #60 is unmerged; main/nightly remained `336ee236` / `326453d` when checked in this batch.
+
+SceneWeaver continues to work with the audited existing H3 core: it stores requested seconds literally for Python and writes explicit user-selected raw frames. It does not use the faulty browser seconds-to-frames conversion. The integration report identifies the native mismatch. The test fixture remains the unmodified nightly core, so these compatibility checks exercise the older helper too.
+
+Validation: the 0.5.9 production build and all 37 frontend plus 112 adapter/proxy tests passed. The full browser suite passed all 99 cases, including staging new seeds together with other typed settings. After a final minimum-frame floating-point boundary correction, the build, all 149 unit/adapter tests and eight settings browser cases passed again. The 1280×720 Inspector screenshot was visually inspected. No production project writes or GPU execution were performed.
+
+Still open in E01/E02: chapter duplication and timeline marker presentation, representative production workflow verification, a native planned-delivery estimate incorporating the effective graph policies, and display of effective chapter dimensions when saved locks override authored requests. Chapter locks, cross-size native context and export restrictions remain authoritative in H3. Rich prompt schemas/history and broader M2 media/reference work remain open; this patch does not complete M2.
+
 ## 0.5.8: native scene and chapter draft edits
 
 - The attached ComfyUI browser discovers the installed `h3_chain_plan_core.mjs` exports independently of ownership, checkpoint and editorial helpers. Structural controls show unavailable when that contract is absent; ordinary prompt drafting remains available.

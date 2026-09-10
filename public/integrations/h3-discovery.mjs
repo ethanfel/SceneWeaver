@@ -1,7 +1,7 @@
 // Discover browser helpers independently: a broken optional module must not
 // hide working integrations. Source markers are reported as inference, never
 // as an installed pack version or proof that a backend route will succeed.
-import { PLAN_AUTHORING_EXPORTS } from './plan-authoring.mjs';
+import { PLAN_AUTHORING_EXPORTS, PLAN_SETTINGS_EXPORTS } from './plan-authoring.mjs';
 
 export async function discoverH3(api, options = {}) {
   const origin = new URL(options.baseUrl || location.href);
@@ -74,6 +74,15 @@ export async function discoverH3(api, options = {}) {
       const value = await module(studio.value, 'h3_chain_plan_core.mjs');
       if (!functions(value, PLAN_AUTHORING_EXPORTS) || !Number.isInteger(value.MAX_SHOTS) || value.MAX_SHOTS < 1 || !Number.isInteger(value.MAX_CHAPTERS) || value.MAX_CHAPTERS < 1) throw new Error();
       adapters.planAuthoring = value;
+    });
+    await probe('planSettings', 'Native duration, seed, shared direction and chapter-resolution draft controls available.', async () => {
+      const value = adapters.planAuthoring;
+      if (!value || !functions(value, PLAN_SETTINGS_EXPORTS) || value.FPS !== 24 || value.MAX_H3_FRAMES !== 3592 || typeof value.MAX_SEED !== 'bigint') throw new Error();
+      adapters.planSettings = true;
+      let roundsUp = false;
+      try { roundsUp = typeof value.h3FrameLength === 'function' && [[1, 39], [6, 158], [12, 294]].every(([seconds, frames]) => value.h3FrameLength(seconds) === frames); }
+      catch { /* Diagnostic only: settings write literal seconds, not this conversion. */ }
+      check('durationRounding', roundsUp ? 'available' : 'unavailable', roundsUp ? 'Native browser duration examples agree with the audited Python 17k+5 frame grid.' : 'The installed H3 browser helper can round requested durations down. SceneWeaver stores literal seconds and previews Python-aligned raw frames; native Studio estimates need the H3 duration-rounding correction.');
     });
     await probe('editorial', 'Native saved-sequence inspection, edit previews and conditional saves available.', async () => {
       const value = await module(studio.value, 'h3_editorial_commands.mjs');

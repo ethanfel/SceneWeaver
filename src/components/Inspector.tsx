@@ -7,15 +7,17 @@ import { Field } from './Controls';
 import { comfy } from '../lib/api';
 import { PlanSource } from './PlanSource';
 import { resolvePlanDocument } from '../../public/integrations/plan-source.mjs';
-import type { PlanEdit } from '../lib/planAuthoring';
+import { canonicalSceneId, type PlanEdit } from '../lib/planAuthoring';
+import { SceneSettings, PlanDefaults } from './SceneSettings';
+import { SharedDirection } from './SharedDirection';
 import { SceneIdentity } from './SceneIdentity';
 import { ChapterMarker, type Chapter } from './ChapterMarker';
 
-type Props = { nativeEditing: boolean; canAuthorPlan: boolean; editPlan: (edit: PlanEdit) => void; savedCut?: ReactNode; workflow: Workflow; sourceBridgeReady: boolean; schemas: Schemas; plan: Plan | null; planId: string; selected: number; nodeId: string; tab: string; setTab: (tab: string) => void; updateInput: (id: string, key: string, value: Value) => void; updatePlan: (plan: Plan) => void; select: (index: number) => void; selectNode: (id: string) => void; editJson: () => void; report: (error: string) => void; connected: boolean };
+type Props = { nativeSettings: boolean; nativeEditing: boolean; canAuthorPlan: boolean; editPlan: (edit: PlanEdit) => void; savedCut?: ReactNode; workflow: Workflow; sourceBridgeReady: boolean; schemas: Schemas; plan: Plan | null; planId: string; selected: number; nodeId: string; tab: string; setTab: (tab: string) => void; updateInput: (id: string, key: string, value: Value) => void; updatePlan: (plan: Plan) => void; select: (index: number) => void; selectNode: (id: string) => void; editJson: () => void; report: (error: string) => void; connected: boolean };
 export function Inspector(p: Props) {
   const node = p.workflow.prompt[p.nodeId], planNode = p.workflow.prompt[p.planId], shot = p.plan?.shots[p.selected];
   const source = resolvePlanDocument(p.workflow.prompt, p.planId);
-  const chapter = (Array.isArray(p.plan?.chapters) ? p.plan.chapters as Chapter[] : []).find(item => item?.start_scene_id === (shot?.id || `clip_${String(p.selected + 1).padStart(4, '0')}`));
+  const chapter = (Array.isArray(p.plan?.chapters) ? p.plan.chapters as Chapter[] : []).find(item => item?.start_scene_id === canonicalSceneId(shot?.id, p.selected));
   const patchShot = (patch: Partial<Shot>) => p.plan && p.updatePlan({ ...p.plan, shots: p.plan.shots.map((s, i) => i === p.selected ? { ...s, ...patch } : s) });
   const move = (direction: number) => {
     if (p.nativeEditing) { p.editPlan({ type: 'move', index: p.selected, direction }); return; }
@@ -41,15 +43,29 @@ export function Inspector(p: Props) {
         {shot ? <>
           {p.nativeEditing ? <SceneIdentity key={`${p.planId}:${p.selected}`} value={shot.id || ''} disabled={!p.canAuthorPlan} rename={id => p.editPlan({ type: 'rename', index: p.selected, id })}/> : <Field label="Scene ID" value={shot.id || ''} onChange={value => patchShot({ id: String(value) })} />}
           <label className="field prompt-field"><span>Scene direction <span className="muted">{promptText(shot.prompt).length} characters</span></span><textarea aria-label="Scene direction" rows={11} placeholder="Describe what happens in this scene…" value={promptText(shot.prompt)} onChange={e => patchShot({ prompt: Array.isArray(shot.prompt) ? e.target.value.split('\n') : e.target.value })} /></label>
+          {p.nativeSettings ? <SceneSettings key={JSON.stringify([p.planId, p.selected, shot.length, shot.frames, shot.duration_seconds, shot.steps, shot.seed, shot.prompt_seed_mode, shot.prompt_seed])} shot={shot} plan={p.plan} inputs={planNode.inputs} index={p.selected} disabled={!p.canAuthorPlan} edit={p.editPlan}/> : <>
           <div className="section-label">GENERATION</div>
           <div className="field-pair"><Field label="Raw frames" value={rawFrames(shot, p.plan, planNode.inputs)} spec={['INT', { min: 5, max: 3592, step: 17 }]} onChange={value => { const next = { ...shot, length: Number(value) }; delete next.frames; delete next.duration_seconds; patchShot({ ...next, frames: undefined, duration_seconds: undefined }); }} /><Field label="Steps" value={shot.steps ?? Number(p.plan.defaults?.steps ?? planNode.inputs.default_steps ?? 20)} spec={['INT', { min: 1, max: 10000 }]} onChange={value => patchShot({ steps: Number(value) })}/></div>
           <small className="hint">H3 frame grid: 5 + 17k at 24 fps. Delivered clips may be shorter after continuity trimming.</small>
-          <Field label="Scene seed" value={shot.seed ?? ''} onChange={value => patchShot({ seed: String(value) || undefined })}/><small className="hint">Leave blank to inherit a deterministic scene seed.</small>
+          <Field label="Scene seed" value={shot.seed ?? ''} onChange={value => patchShot({ seed: String(value) || undefined })}/><small className="hint">Leave blank to inherit a deterministic scene seed.</small></>}
           <fieldset className="node-widget-field" disabled={p.nativeEditing && !p.canAuthorPlan}><div className="scene-actions"><button onClick={() => move(-1)} disabled={p.selected === 0} title="Move scene earlier"><ArrowLeft size={14}/></button><button onClick={() => move(1)} disabled={p.selected >= p.plan.shots.length - 1} title="Move scene later"><ArrowRight size={14}/></button><button onClick={() => addShot(true)}><Copy size={14}/>Duplicate</button><button aria-label="Delete scene" disabled={p.plan.shots.length <= 1} onClick={() => { if (p.nativeEditing) { p.editPlan({ type: 'remove', index: p.selected }); return; } p.updatePlan({ ...p.plan!, shots: p.plan!.shots.filter((_, i) => i !== p.selected) }); p.select(Math.max(0, p.selected - 1)); }}><Trash2 size={14}/></button></div></fieldset>
           {p.nativeEditing && <small className="hint">{p.canAuthorPlan ? 'Structure changes stay in your Plan draft until applied. Review continuation settings after moving or removing scenes.' : 'Scene structure editing requires the native H3 authoring helpers and a current live attachment.'}</small>}
-          {p.nativeEditing && <ChapterMarker key={JSON.stringify([p.planId, p.selected, chapter])} chapter={chapter} index={p.selected} disabled={!p.canAuthorPlan} edit={p.editPlan}/>}
+          {p.nativeEditing && <ChapterMarker settings={p.nativeSettings} shots={p.plan.shots} inputs={planNode.inputs} key={JSON.stringify([p.planId, p.selected, chapter])} chapter={chapter} index={p.selected} disabled={!p.canAuthorPlan} edit={p.editPlan}/>}
         </> : <button onClick={() => addShot()}><Plus size={15}/>Add first scene</button>}
-        <details className="shared-direction"><summary>Shared direction</summary><textarea aria-label="Shared direction" rows={6} placeholder="Identity, setting, and continuity across every scene…" value={promptText(p.plan.prompt_prefix ?? p.plan.global_prompt)} onChange={e => p.updatePlan({ ...p.plan!, prompt_prefix: e.target.value })}/></details>
+        {p.nativeSettings ? <>
+          <PlanDefaults key={JSON.stringify([p.planId, p.plan.defaults])} plan={p.plan} inputs={planNode.inputs} index={p.selected} disabled={!p.canAuthorPlan} edit={p.editPlan}/>
+          <SharedDirection key={JSON.stringify([p.planId, p.plan.prompt_prefix, p.plan.global_prompt])} value={promptText(p.plan.prompt_prefix ?? p.plan.global_prompt)} disabled={!p.canAuthorPlan} stage={text => p.editPlan({ type: 'shared-direction', index: p.selected, text })}/>
+          <details className="plan-canvas"><summary>Plan canvas and base seed</summary>{['width', 'height', 'base_seed', 'default_duration_seconds', 'default_steps'].filter(name => name in planNode.inputs).map(name => {
+            const value = planNode.inputs[name];
+            if (isLink(value)) return <div className="connection-field" key={name}><span>{name.replaceAll('_', ' ')}</span><button onClick={() => p.selectNode(value[0])}><Link2 size={12}/>Connected input #{value[0]}</button></div>;
+            const spec = inputSpecs(p.schemas[planNode.class_type]).find(([key]) => key === name)?.[1];
+            return <fieldset key={name} className="node-widget-field" disabled={Array.isArray(planNode._meta?.editable) && !planNode._meta.editable.includes(name)}><Field label={name} value={value} spec={spec} onChange={next => {
+              if (['width', 'height'].includes(name) && (!Number.isInteger(Number(next)) || Number(next) < 32 || Number(next) % 32)) { p.report('Plan dimensions must be positive multiples of 32.'); return; }
+              if (name === 'base_seed') { try { const seed = BigInt(String(next)); if (seed < 0n || seed > 18446744073709551615n) throw new Error(); } catch { p.report('Base seed must be an unsigned 64-bit integer.'); return; } }
+              p.updateInput(p.planId, name, next);
+            }}/></fieldset>;
+          })}<small className="hint">These are the Plan node’s inputs. JSON defaults override node duration/steps; scene settings override both.</small></details>
+        </> : <details className="shared-direction"><summary>Shared direction</summary><textarea aria-label="Shared direction" rows={6} placeholder="Identity, setting, and continuity across every scene…" value={promptText(p.plan.prompt_prefix ?? p.plan.global_prompt)} onChange={e => p.updatePlan({ ...p.plan!, prompt_prefix: e.target.value })}/></details>}
         <button className="subtle-button" onClick={() => { p.selectNode(p.planId); p.setTab('node'); }}><ArrowDownLeft size={15}/>All plan settings</button>
       </fieldset> : p.tab === 'node' && node ? <>
         <div className="node-inspector-name"><span className="section-label">NODE {p.nodeId}</span><h3>{nodeTitle(p.nodeId, node)}</h3><small>{node.class_type}</small></div>

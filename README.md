@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.8** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.9** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -71,7 +71,11 @@ In **0.5.3**, **Branches** opens the native branch manager: save authoring, save
 
 ## September 2026 H3 compatibility update
 
-In **0.5.8**, attached scene structure edits use the installed H3 Plan helpers: add, duplicate, rename, move and remove scenes, and add, edit or remove chapter markers. Rename updates chapter starts and ID-based context references; duplicate uses native continuation remapping and exact seed handling. Results stay in the current draft until **Apply to ComfyUI**. Bare scene lists, prompt-string scenes and top-level duration/steps shorthand can be displayed without rewriting the source. Refresh the ComfyUI tab and reopen SceneWeaver after updating. Chapter resolution, full inherited-setting controls and history remain roadmap work.
+In **0.5.8**, attached scene structure edits use the installed H3 Plan helpers: add, duplicate, rename, move and remove scenes, and add, edit or remove chapter markers. Rename updates chapter starts and ID-based context references; duplicate uses native continuation remapping and exact seed handling. Results stay in the current draft until **Apply to ComfyUI**. Bare scene lists, prompt-string scenes and top-level duration/steps shorthand can be displayed without rewriting the source. Refresh the ComfyUI tab and reopen SceneWeaver after updating.
+
+In **0.5.9**, the Scene Inspector adds inherited / requested-seconds / exact-frame duration, resettable steps and generation seeds, separate prompt-alternative seeds, Plan JSON defaults, shared direction that preserves legacy keys, and connected Plan canvas controls. Chapter markers can move to another scene and use custom dimensions or inherit the Plan canvas. **Stage** keeps these changes in the existing recoverable draft; **Apply to ComfyUI** updates their original text source or node widget.
+
+Requested seconds stay literal for H3's Python compiler. SceneWeaver's raw-frame preview follows its upward rounding and floating-point tolerance. The older H3 browser helper has a separate rounding bug, corrected in draft [H3 PR #60](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/60). The integration report identifies that mismatch; these SceneWeaver settings do not require the proposed fix to be merged. Native saved chapter locks and cross-resolution continuity rules still apply during compilation.
 
 SceneWeaver follows the working branch of the selected Plan. Checkpoint reads, saved-cut writes, restoration, soundtrack presentation, thumbnails, reviews, and browser draft backups retain that branch identity. The branch bar shows its name. Switching branches in Plan Studio updates the companion; unapplied drafts stay with their previous branch and require conflict resolution. An empty branch never displays Original’s clips. Branch commands delegate to the mounted native Studio when its integration interface is available.
 
