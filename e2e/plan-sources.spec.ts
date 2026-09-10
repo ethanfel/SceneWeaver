@@ -138,7 +138,7 @@ test('unknown runtime Plans do not show fallback scenes or Original checkpoints,
   await expect(companion.getByRole('textbox', { name: 'Scene direction', exact: true })).toHaveCount(0);
   await expect(companion.getByLabel('Working branch')).toContainText('Unresolved');
   expect(checkpointReads).toEqual([]);
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Media', exact: true }).click();
   await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('still-shared');
   await companion.locator('.asset-card').filter({ has: companion.getByRole('textbox', { name: 'Tag for hero', exact: true }) }).getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(companion.getByRole('textbox', { name: 'Tag for still-shared', exact: true })).toBeVisible();

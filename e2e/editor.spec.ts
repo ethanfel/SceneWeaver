@@ -32,10 +32,11 @@ test('browses a nested server workflow and exposes node settings', async ({ page
   await page.getByRole('button', { name: 'Server library' }).click();
   await page.getByRole('button', { name: 'H3/Test workflow.json' }).click();
   await expect(page.getByRole('textbox', { name: 'Project name' })).toHaveValue('H3/Test workflow');
-  await page.locator('.viewer-tabs').getByRole('button', { name: 'Workflow', exact: true }).click();
+  await page.locator('.top-toolbar').getByRole('button', { name: 'Workflow', exact: true }).click();
   await page.locator('.workflow-node').filter({ hasText: 'MiniMaxH3ChainPlan' }).first().click();
   await expect(page.getByLabel('run name', { exact: true })).toHaveValue('sceneweaver_first_film');
   await page.getByLabel('width', { exact: true }).fill('1280'); await page.getByLabel('width', { exact: true }).press('Tab');
+  await page.locator('.top-toolbar').getByRole('button', { name: 'Workflow', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export API', exact: true }).click();
   expect((await download).suggestedFilename()).toBe('workflow.api.json');
 });

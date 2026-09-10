@@ -64,14 +64,15 @@ test('ruler drag scrubs gaps, stays accurate when zoomed and scrolled, and suppo
   await ruler.press('End'); await expectTime(page, 20 + 124 / 24);
 });
 
-test('timeline seeks return from isolated takes and other tabs, and clip double-clicks retain their position', async ({ page }) => {
+test('timeline seeks retain independent source previews and return from other pages, and clip double-clicks retain their position', async ({ page }) => {
   await page.getByRole('combobox', { name: 'Preview scene take' }).selectOption('base');
-  await expect(page.getByRole('button', { name: 'Clip', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.source-canvas video')).toHaveAttribute('src', /base.webm/);
+  await expect(page.getByRole('button', { name: 'Sequence', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await clickRuler(page, 0, .5); await expectTime(page, 1);
   await expect(page.getByRole('button', { name: 'Sequence', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /final-alt.webm/);
-  await page.getByRole('button', { name: 'Generation', exact: true }).click();
-  await expect(page.locator('.viewer-canvas video')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Generate', exact: true }).click();
+  await expect(page.locator('.viewer-canvas video')).toBeHidden();
   await clickRuler(page, 1, 2 / 4.5); await expectTime(page, 12);
   await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /second.webm/);
   await expect.poll(() => page.locator('.viewer-canvas video').evaluate((element: HTMLVideoElement) => element.currentTime)).toBeCloseTo(2, 2);

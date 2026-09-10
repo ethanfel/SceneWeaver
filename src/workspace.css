@@ -1,0 +1,86 @@
+/* Page layout preferences only; workflow geometry and H3 state stay native. */
+[hidden] { display: none !important; }
+.workspace-area { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.workspace-area .editor-main { grid-template-columns: var(--bin-width) var(--bin-handle) minmax(0, 1fr) var(--inspector-handle) var(--inspector-width); gap: 0; min-height: 0; }
+.workspace-area .media-bin { grid-column: 1; max-height: none; }
+.workspace-area .center-panel { grid-column: 3; min-height: 0; max-height: none; overflow: hidden; }
+.inspector-pane { grid-column: 5; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.inspector-pane .inspector { width: 100%; max-height: none; }
+.resize-handle { flex-shrink: 0; position: relative; background: #141619; outline-offset: -2px; touch-action: none; z-index: 2; }
+.resize-handle:hover, .resize-handle:focus-visible { background: #a48155; }
+.resize-handle.vertical { width: 6px; cursor: col-resize; }
+.resize-handle.horizontal { height: 6px; cursor: row-resize; }
+.resize-handle[aria-label="Resize media pool"] { grid-column: 2; }
+.resize-handle[aria-label="Resize inspector"] { grid-column: 4; }
+.workspace-area > .timeline { flex: 0 0 var(--timeline-height); height: var(--timeline-height); min-height: 0; max-height: none; }
+.workspace-area .timeline-grid { overflow: auto; }
+.workspace-body { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.workspace-tools { display: flex; gap: 3px; margin-right: 8px; }
+.workspace-title { display: flex; align-items: center; padding: 0 8px; font-size: 12px; font-weight: 500; }
+.program-viewer, .workspace-content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+.workspace-page { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.source-pane { display: flex; flex-shrink: 0; min-width: 180px; max-width: calc(100% - 260px); min-height: 0; overflow: auto; background: #171a1d; }
+.program-viewer .viewer-canvas { margin: 8px 10px 0; min-height: 80px; }
+.program-viewer .transport { margin: 0 10px; height: 38px; min-height: 38px; }
+.program-viewer .viewer-scrubber { width: calc(100% - 22px); margin: 0 11px 7px; }
+.program-viewer .audio-controls { padding: 3px 10px 7px; gap: 6px; }
+.program-viewer .playback-mode { padding: 6px 10px; flex-shrink: 0; }
+.program-viewer .take-selector { padding: 4px 10px; flex-shrink: 0; }
+.program-viewer .take-selector select { width: 100%; }
+.program-viewer .take-selector > label { min-width: 130px; }
+.program-viewer .take-selector > button { flex-shrink: 0; }
+.program-viewer .viewer-empty { padding: 10px; }
+.program-viewer .audio-controls .timeline-clock { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.source-viewer { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 240px; padding: 0 10px 6px; }
+.source-viewer > header { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-height: 35px; color: #d8c3a9; }
+.source-viewer > header span { font-size: 10px; color: #94a1ae; }
+.source-canvas { position: relative; flex: 1; min-height: 80px; border: 1px solid #30363d; background: #090c0e; overflow: hidden; }
+.source-canvas > video, .source-canvas > img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
+.source-canvas > audio { display: none; }
+.source-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #97a5b4; height: 100%; min-height: 80px; padding: 10px; font-size: 11px; }
+.source-placeholder p { margin: 5px 0; overflow-wrap: anywhere; }
+.source-placeholder svg { flex-shrink: 0; }
+.source-transport { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 38px; font-size: 10px; }
+.source-transport button { background: transparent; border-color: transparent; }
+.source-viewer > input { flex-shrink: 0; height: 4px; margin: 3px 0 7px; }
+.source-monitor { display: flex; align-items: center; gap: 7px; min-height: 30px; font-size: 10px; color: #a5adb8; }
+.source-monitor input { width: 65px; }
+.source-monitor span { margin-left: auto; }
+.source-name { font-size: 10px; color: #9da8b5; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; margin: 0; padding: 4px 0; }
+.source-canvas:fullscreen { background: #000; border: 0; }
+.app-footer .workspace-navigation { display: flex; flex-shrink: 0; position: static; transform: none; }
+.app-footer .workspace-navigation button { min-width: 70px; padding: 6px 9px; }
+.app-footer > div { min-width: 0; }
+.app-footer .autosave { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layout-storage-note { position: fixed; right: 10px; bottom: 58px; z-index: 20; padding: 8px; background: #45392b; font-size: 11px; }
+.workflow-drawer { position: fixed; z-index: 25; top: 100px; left: 12px; bottom: 65px; width: min(670px, calc(100vw - 30px)); display: flex; flex-direction: column; background: #1c2026; border: 1px solid #505863; box-shadow: 0 8px 40px #0009; }
+.workflow-drawer > header { display: flex; justify-content: space-between; padding: 8px 16px; align-items: center; border-bottom: 1px solid #454b55; }
+.workflow-drawer > header h2 { font-size: 14px; margin: 0; }
+.workflow-drawer .workflow-view { min-height: 0; overflow: auto; flex: 1; }
+@media (max-height: 860px) {
+  .program-viewer .viewer-caption { display: none; }
+  .program-viewer .take-selector { padding: 3px 8px; gap: 6px; }
+  .program-viewer .take-selector > label { min-width: 0; }
+  .program-viewer .take-selector select { min-width: 0; font-size: 10px; }
+  .program-viewer .playback-mode { padding: 3px 8px; gap: 6px; font-size: 9px; }
+  .program-viewer .viewer-canvas { min-height: 64px; margin-top: 3px; }
+  .program-viewer .transport { height: 30px; min-height: 30px; }
+  .program-viewer .audio-controls { padding: 2px 8px; gap: 4px; flex-shrink: 0; }
+  .program-viewer .audio-controls label { font-size: 9px; }
+  .program-viewer .audio-controls > input[type=range] { width: 46px; }
+  .program-viewer .audio-controls .timeline-clock { display: none; }
+  .program-viewer .subtitle-overlay { font-size: 14px; }
+  .source-viewer { min-height: 215px; }
+}
+@media (max-width: 1100px) {
+  .app-footer .footer-gpu, .app-footer .autosave { display: none; }
+  .workspace-body .audio-controls .timeline-clock { display: none; }
+}
+@media (max-width: 850px) {
+  .app-shell { height: 100dvh; min-height: 680px; overflow: hidden; }
+  .workspace-area { min-height: 420px; }
+  .workspace-area .editor-main { min-height: 0; }
+  .app-footer .workspace-navigation button { min-width: 54px; padding: 5px; }
+  .app-footer > div { max-width: 110px; }
+  .workspace-area .viewer-canvas { min-height: 80px; }
+}

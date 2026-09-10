@@ -6,7 +6,7 @@ Static census of nightly `cdbd44d`: **89 registered node types**, **50 HTTP meth
 
 Every row remains subject to the M0 input/action audit. A generic widget inspector or an Open in ComfyUI shortcut is not proof of dedicated task parity. Milestones indicate completion targets; basic controls may land earlier. Legacy and experimental behavior keeps its upstream classification.
 
-The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
+The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
 
 ## Registered nodes
 

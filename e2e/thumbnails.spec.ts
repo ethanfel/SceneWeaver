@@ -21,7 +21,8 @@ test('uses the saved alternate thumbnail in the timeline and scene bin while tak
   await expect(second.getByRole('img')).toHaveAttribute('src', new RegExp(`revision=${'c'.repeat(32)}`));
   await expect(page.getByRole('button', { name: 'Select scene 3: the_departure', exact: true }).getByRole('img')).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Preview scene take' }).selectOption('base');
-  await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /base.webm/);
+  await expect(page.locator('.source-canvas video')).toHaveAttribute('src', /base.webm/);
+  await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /final-alt.webm/);
   await expect(thumbnail).toHaveAttribute('src', url.pathname + url.search);
   await second.click();
   await expect(page.locator('.viewer-canvas video')).toHaveAttribute('src', /second.webm/);

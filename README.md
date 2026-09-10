@@ -1,12 +1,31 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.3** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.4** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
 ComfyUI remains the source of truth for the live workflow. H3 owns generation, continuity, project ownership, checkpoints, and assembly. Standalone editing is a later milestone.
 
 The active development goal is documented in the [complete workflow parity plan](docs/WORKFLOW_PARITY_PLAN.md), with a [node/API/recipe coverage register](docs/planning/H3_FEATURE_COVERAGE.md) and [implementation status](docs/planning/IMPLEMENTATION_STATUS.md). Milestones remain open until their native workflows and recovery paths are verified.
+
+## Workspace (0.5.4)
+
+The bottom navigation now has six production pages. **Workflow** in the top toolbar opens the node drawer from any page.
+
+| Page | Available controls |
+| --- | --- |
+| Media | Project catalog, uploads/imports, tags, roles, reference enablement and source previews |
+| Edit | Saved sequence player, timeline seeking, scene prompt inspector and Takes/A–B comparison |
+| Generate | PreviewRelay sampling monitor; queue and review controls remain available in the render queue |
+| Finish | Saved original and processed take inventories, source preview and downloads |
+| Audio | Soundtrack assets, full mix/vocal/instrumental bindings and caption text |
+| Deliver | Existing saved outputs, previews and downloads |
+
+Drag the dividers to resize the media pool, inspector, source viewer and timeline. Focus a divider and use arrow keys for keyboard resizing; double-click it to reset that divider. The viewer toolbar toggles panels and resets the current page's layout. Page layouts are saved in this browser, and narrow windows temporarily hide side panels to leave room for the viewers.
+
+**Source** previews an asset, saved take or processing output independently of the saved sequence. Each viewer has its own position and playback controls. Starting one monitor pauses the other; page changes pause hidden playback. The sequence keeps its position across pages. Asset field drafts and take comparisons survive page navigation during this session; they are not persisted by workspace preferences. Source selection clears when the server, attached workflow, Plan, project or working branch changes.
+
+These pages organize the existing companion tools. Finishing jobs, first-class generation range controls, new assembly/export commands and full editorial/audio editing still require the remaining roadmap adapters; a new page is not a parity claim.
 
 ## Integration foundations (0.5)
 
@@ -24,7 +43,7 @@ SceneWeaver follows the working branch of the selected Plan. Checkpoint reads, s
 
 **Takes** now separates Original, DeRoPE, latent upscale, and pixel upscale inventories. Processed takes show their saved profile, dimensions, date, source identity, and missing files, with video/audio preview and download. They do not become generation checkpoints or replace the final cut automatically. Select their output path in ComfyUI’s Checkpoint Manager.
 
-**Assets** adds search, type filters, lyrics/SRT editing, and synchronized soundtrack bindings. For a source-track asset, assign enabled audio/video assets to Full mix, Vocals, and Instrumental, then apply. Keep stems at the full song length, including silence. H3 uses a full mix unchanged; without one it mixes vocals and instrumental. Scene Lip-sync and subtitle mode/offset stay in Plan Studio. Refresh its saved presentation there when changing soundtrack configuration. Assets and their metadata remain shared across branches.
+**Media** and **Audio** provide search, type filters, lyrics/SRT editing, and synchronized soundtrack bindings. For a source-track asset, assign enabled audio/video assets to Full mix, Vocals, and Instrumental, then apply. Keep stems at the full song length, including silence. H3 uses a full mix unchanged; without one it mixes vocals and instrumental. Scene Lip-sync and subtitle mode/offset stay in Plan Studio. Refresh its saved presentation there when changing soundtrack configuration. Assets and their metadata remain shared across branches.
 
 Recovered review gates marked non-actionable by H3 show recovery instructions with generation decisions disabled.
 
@@ -83,15 +102,15 @@ The Node service listens on loopback. It proxies HTTP, WebSocket events, uploads
 | See the sequence | Select scenes in the bin or timeline. Saved H3 trims, placements, gaps, and chosen alternate pictures are reflected. Timeline clips and scene cards display cached thumbnails of the saved final-cut revision. Unfinished scenes use labeled raw estimates. |
 | Play the whole cut | **Sequence** is the default: Play or Space advances through saved clips and timeline gaps. Click or drag the timeline ruler to pause and seek the saved cut, including from other viewer tabs or isolated takes. With the ruler focused, Left/Right steps one frame, Shift+Left/Right steps one second, and Home/End jumps to the sequence boundaries. Unrendered scenes show a timed placeholder; playback stops at the sequence end. |
 | Hear audio and see captions | The viewer pairs raw/alternate pictures with generated WAV sidecars, synchronizes the saved Plan Studio soundtrack, and overlays its selected SRT/LRC lyrics. Use the generated-audio/source-soundtrack switches, volume, and CC controls. |
-| Watch sampling | **Generation** connects to an optional PreviewRelay channel, displays still/animated samples or MP4 previews, and plays decoded audio on request. Step counts, average sampling time, and preview decoding cost are shown. |
-| Compare scene takes | The **Scene take** selector previews the final cut, its generated base, or compatible picture alternates. **All takes** opens the revision list for that scene. **Clip** mode stops at the selected scene’s end; selecting a base or alternate take enters this mode. Return to **Sequence** to watch the saved final-cut choices. These preview choices do not activate a different H3 checkpoint. |
+| Watch sampling | **Generate** connects to an optional PreviewRelay channel, displays still/animated samples or MP4 previews, and plays decoded audio on request. Step counts, average sampling time, and preview decoding cost are shown. |
+| Compare scene takes | The **Source take** selector opens the final cut picture, generated base, or a compatible alternate in the independent source viewer. **All takes** opens the revision list and A–B comparison. The program's **Clip** mode stops at the selected scene's saved trim; **Sequence** plays the saved cut. Source preview choices do not change its clock, final-cut choices or active H3 checkpoint. |
 | Edit prompts | Change the scene direction, shared direction, seeds, frame counts, or scalar node settings. Scene edits target the effective supported Plan text widget. **Apply to ComfyUI** writes through native widget callbacks; shared sources require reviewing their consumers first. |
 | Save and switch branches | Apply the SceneWeaver draft, then open **Branches**. Branch saves are separate from workflow-file saves. Switch/create/reload actions preview their consequences before using the native Studio controller. The queue must be idle, and the associated Studio must expose the branch interface. Connected Plan text still needs a native restoration adapter. |
 | Handle simultaneous edits | Disjoint widget edits merge. Changes to the same widget raise a conflict and preserve the local draft. Export the draft before **Reload from ComfyUI** to keep both versions. A plan JSON widget is one conflict unit. |
 | Run the workflow | **Queue in ComfyUI** uses the original frontend queue path, retaining custom serialization, subgraphs, ownership proofs, and queue hooks. Apply the draft first. |
 | Follow a running project | Existing queued/running jobs with the selected H3 run name are discovered. The parent tab forwards execution events, and the companion reconciles queue, review, and checkpoint state through HTTP. |
 | Review generations | Approve, retry, reroll, approve-and-stop, or select saved candidate takes at H3's review boundary. Native H3 review behavior remains authoritative. |
-| Manage assets | **Assets** previews the project catalog, uploads one file at a time, imports relative ComfyUI input paths, and edits tags, roles, and enabled state. Writes use the carousel's native ownership helper and update its catalog. Apply prompt drafts before asset writes. |
+| Manage assets | **Media** previews the project catalog, uploads one file at a time, imports relative ComfyUI input paths, and edits tags, roles, and enabled state. Writes use the carousel's native ownership helper and update its catalog. Apply prompt drafts before asset writes. |
 | Compare saved takes | **Takes → Compare takes** shows two pictures with their prompts, seeds, and durations. Playing either side pauses the other. Alternates use their base checkpoint’s generated audio. |
 | Choose the final-cut picture | **Use in final cut** selects the active base picture or a compatible alternate. H3 saves the choice with an editorial revision check; the timeline and native Plan Studio refresh. Other trims, placements, soundtrack and subtitle settings are preserved. |
 | Restore checkpoints | **Restore checkpoint…** previews the chapter, checkpoints to activate, later active pointers to clear, and dependencies outside that chapter. **Restore this branch** uses H3’s native activation and Plan restoration helpers. The ComfyUI queue must be empty. Immutable takes remain available; the operation does not queue generation. |
@@ -108,17 +127,17 @@ Install [ComfyUI-PreviewRelay](https://github.com/drozbay/ComfyUI-PreviewRelay) 
 
 1. Insert **Preview Relay** on the MODEL connection that reaches your sampler. Give it a channel unique to your workflow, for example `sceneweaver_my_film`.
 2. Configure preview resolution, frame count, and VAE decoding steps in ComfyUI. A compatible optional **audio_vae** supplies sample audio. Decoding previews adds work to sampling; the relay can use fast previews or selected VAE steps.
-3. Refresh SceneWeaver, open **Generation**, and choose the channel. Literal channel names from the attached workflow are suggested automatically. Use **Check installation** if SceneWeaver was connected before the node was installed.
+3. Refresh SceneWeaver, open **Generate**, and choose the channel. Literal channel names from the attached workflow are suggested automatically. Use **Check installation** if SceneWeaver was connected before the node was installed.
 4. Start generation normally. **Sample audio** enables monitoring; **Open PreviewRelay** opens its native viewer and decoding controls.
 
-The current sample is restored when attaching mid-render or reconnecting. Only the latest sample is retained locally. A new run clears the previous picture, and changing channels, servers, or the attached workflow cancels pending preview reads. Leaving the Generation tab stops its media playback. Animated images and audio loop independently; MP4 samples provide a clock for audio alignment.
+The current sample is restored when attaching mid-render or reconnecting. Only the latest sample is retained locally. A new run clears the previous picture, and changing channels, servers, or the attached workflow cancels pending preview reads. Leaving Generate stops its media playback. Animated images and audio loop independently; MP4 samples provide a clock for audio alignment.
 
 PreviewRelay events are shared by channel across the ComfyUI server and do not identify a prompt, workflow, or scene. SceneWeaver displays the channel name and never attaches sampling images to a scene or marks them as saved takes. The integration reads PreviewRelay's existing HTTP endpoints and WebSocket notifications through the local proxy. It does not install nodes, rewire the graph, change decoding settings, or start a render automatically. PreviewRelay remains an experimental, optional dependency; no additional ports or Docker mounts are needed.
 
 ## Current boundaries
 
 - The timeline edits the generation sequence. Trimming rendered media, transitions, audio mixing, arbitrary track placement, and independent movie export are future work. Sequence timing applies saved H3 trims and placements, combines delivered clips with raw estimates, and does not resolve every H3 continuity policy for unfinished scenes in advance. Sequence playback preserves gaps and unfinished scenes. It ends at the last planned scene, even if the source soundtrack is longer. Remote clip loading can briefly buffer at cuts; this is a browser preview, not a frame-exact assembled export.
-- Subtitle text and soundtrack bindings can be edited in Assets; subtitle mode/offset and the saved soundtrack presentation remain controlled by Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
+- Subtitle text and soundtrack bindings can be edited in Media/Audio; subtitle mode/offset and the saved soundtrack presentation remain controlled by Plan Studio; companion volume and CC switches affect preview only. Subtitle overlays are not burned into downloaded videos. Plan Studio must have a saved source presentation for its soundtrack to be available.
 - Native reference-slot binding, folder organization, asset deletion, checkpoint deletion, lineage attribution, and workflow-local branch pinning remain in ComfyUI. The companion provides navigation to the relevant native nodes.
 - Take writes require the selected Plan and its matching Asset Carousel. Unsupported native adapters leave their actions disabled. Checkpoint activation changes only the selected working branch within its chapter (other workflows selecting that same branch share those changes) and restores scene settings into the attached Plan; it does not configure Loop Start resume settings or restore model/policy wiring. Save the restored workflow in ComfyUI and inspect its generation controls before queuing.
 - Checkpoint restoration currently requires a directly editable Plan JSON widget. Connected or read-only Plan text needs an additional native restoration adapter; eligible saved-picture choices remain usable when the effective branch is known. Arbitrary computed text and native serializers are not evaluated during inspection. Native top-level array/string-shot Plan shorthand still needs an authoring adapter.

@@ -208,7 +208,7 @@ A remote “open folder” action cannot open an arbitrary container directory i
 
 ## 5. Delivery sequence and acceptance gates
 
-Milestone numbers are ordering labels, not promised release dates. Estimate calendar work after M0 identifies the actual production graph and missing upstream interfaces. Each milestone ships a usable vertical slice with its own compatibility and recovery checks.
+Milestone numbers are ordering labels, not release versions or promised dates. Implementation batches use patch releases in the current series: **0.5.1, 0.5.2, 0.5.3, ...**. A milestone does not require a jump to 0.6. Estimate calendar work after M0 identifies the actual production graph and missing upstream interfaces. Each milestone ships a usable vertical slice with its own compatibility and recovery checks.
 
 ### M0 — Integration contract and exact workflow audit
 

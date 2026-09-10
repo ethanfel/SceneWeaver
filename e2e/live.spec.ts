@@ -115,7 +115,7 @@ test('edits the wired Carousel through Get/Set even when another Carousel has th
   await companion.locator('.workflow-binding > summary').click();
   await expect(companion.locator('.binding-details')).toContainText('Bound project assets');
   await companion.locator('.workflow-binding > summary').click();
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Media', exact: true }).click();
   await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('bound-hero');
   await companion.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(companion.getByRole('textbox', { name: 'Tag for bound-hero', exact: true })).toBeVisible();
@@ -166,12 +166,13 @@ test('preserves a draft on conflicting native edits and blocks writes after a ta
 });
 test('manages the native project catalog and reads saved checkpoint metadata', async ({ page }) => {
   const companion = await attach(page);
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Media', exact: true }).click();
   await expect(companion.getByRole('textbox', { name: 'Tag for hero', exact: true })).toBeEnabled();
   await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('lead');
   await companion.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(companion.getByRole('textbox', { name: 'Tag for lead', exact: true })).toHaveValue('lead');
   expect(await page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((n: any) => n.id === '9000').widgets.find((w: any) => w.name === 'catalog_json').value).assets[0].tag)).toBe('lead');
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Edit', exact: true }).click();
   await companion.locator('.viewer-tabs').getByRole('button', { name: 'Takes', exact: true }).click();
   await expect(companion.getByText('Active take', { exact: true })).toBeVisible();
   await expect(companion.getByText('Seed 18446744073709551615', { exact: true })).toBeVisible();
@@ -222,7 +223,8 @@ test('plays the final-cut alternate with separate audio, source music, and timed
   await companion.getByRole('button', { name: 'Toggle subtitles' }).click();
   await expect(companion.getByTestId('subtitle-overlay')).not.toBeVisible();
   await companion.getByRole('combobox', { name: 'Preview scene take' }).selectOption('base');
-  await expect(video).toHaveAttribute('src', /base.webm/);
+  await expect(companion.locator('.source-canvas video')).toHaveAttribute('src', /base.webm/);
+  await expect(video).toHaveAttribute('src', /final-alt.webm/);
   await expect.poll(() => generated.evaluate((e: HTMLAudioElement) => e.paused)).toBe(true);
 });
 test('keeps captions and source music aligned after editorial trims, gaps, and scene seeking', async ({ page, request }) => {
@@ -285,7 +287,7 @@ test('advances directly to an adjacent scene and releases the previous picture a
   await expect(companion.getByRole('button', { name: 'Play preview', exact: true })).toBeVisible();
   await expect(companion.getByRole('slider', { name: 'Seek sequence' })).toHaveValue('0');
 });
-test('clip mode stops at its trim and choosing another take pauses playback', async ({ page, request }) => {
+test('clip mode stops at its trim and source playback pauses the program', async ({ page, request }) => {
   await request.post('/comfy/test/playback');
   const companion = await attach(page);
   await companion.getByRole('button', { name: 'Clip', exact: true }).click();
@@ -297,10 +299,12 @@ test('clip mode stops at its trim and choosing another take pauses playback', as
   await companion.getByRole('button', { name: 'Play preview', exact: true }).click();
   await companion.getByRole('combobox', { name: 'Preview scene take' }).selectOption('base');
   await expect(companion.getByRole('button', { name: 'Clip', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(companion.locator('.source-canvas video')).toHaveAttribute('src', /base.webm/);
+  await companion.getByRole('button', { name: 'Play source', exact: true }).click();
   await expect(companion.getByRole('button', { name: 'Play preview', exact: true })).toBeVisible();
-  await expect(companion.getByRole('slider', { name: 'Seek preview' })).toHaveValue('0');
+  const stopped = Number(await companion.getByRole('slider', { name: 'Seek preview' }).inputValue());
   await companion.getByRole('button', { name: 'Sequence', exact: true }).click();
-  await expect(companion.locator('.viewer-canvas video')).toHaveAttribute('src', /final-alt.webm/);
+  await expect.poll(() => companion.getByRole('slider', { name: 'Seek sequence' }).inputValue().then(Number)).toBeCloseTo(stopped, 2);
 });
 test('plays an unrendered scene to the sequence end, then restarts with Space and stops on leaving the viewer', async ({ page, request }) => {
   await request.post('/comfy/test/playback');
@@ -317,6 +321,6 @@ test('plays an unrendered scene to the sequence end, then restarts with Space an
   await expect.poll(() => seek.inputValue().then(Number)).toBeGreaterThan(.1);
   expect(Number(await seek.inputValue())).toBeLessThan(2);
   await companion.getByTestId('source-audio').evaluate(element => { (window as any).lastSoundtrack = element; });
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Media', exact: true }).click();
   expect(await companion.evaluate(() => (window as any).lastSoundtrack.paused)).toBe(true);
 });

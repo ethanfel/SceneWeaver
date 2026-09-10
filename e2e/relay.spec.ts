@@ -9,7 +9,7 @@ async function openGeneration(page: Page, channel = 'film A') {
   const opened = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open companion' }).click();
   const companion = await opened;
   await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Generation', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Generate', exact: true }).click();
   return companion;
 }
 test('explains the optional Docker installation without changing or queuing the workflow', async ({ page, request }) => {
@@ -43,7 +43,7 @@ test('discovers the live workflow channel and restores animated media and audio 
   expect(await companion.evaluate(async url => { try { await fetch(url!); return false; } catch { return true; } }, oldUrl)).toBe(true);
   await companion.getByTestId('relay-audio').evaluate(audio => { (window as any).sampleAudio = audio; });
   await companion.screenshot({ path: 'test-results/generation-preview.png', fullPage: true });
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Viewer', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Edit', exact: true }).click();
   expect(await companion.evaluate(() => (window as any).sampleAudio.paused)).toBe(true);
   expect(errors).toEqual([]);
 });

@@ -76,7 +76,19 @@ Validation: final 0.5.3 build passed; 31 frontend unit tests and 79 adapter/prox
 
 H3 validation: seven interface tests plus the existing branch, recovery, Studio branch-switch and Plan Studio JavaScript scripts pass. Node smoke, workflow catalog and public compatibility scripts pass. The broader CPU chain smoke test was attempted with `/media/p5/Comfyui` and stops on its local Python dependency `comfy_aimdo.malloc_graph`; it did not validate chain execution. The user's dirty H3 checkout was untouched, and no production writes or GPU jobs were performed.
 
-Still needed for M1: integrate and validate the native interface on a representative project, build the six-page resizable workspace/source-viewer shell, and complete the one-scene generation → review → take selection → assembled delivery path. P05/P06 and M1 are not complete merely because their native command entrypoints exist.
+After 0.5.3, M1 still needed the workspace shell below, integration and validation of the native interface on a representative project, and the one-scene generation → review → take selection → assembled delivery path. P05/P06 and M1 are not complete merely because their native command entrypoints exist.
+
+## 0.5.4: workspace pages and independent source preview
+
+- Added Media, Edit, Generate, Finish, Audio and Deliver navigation, with the Workflow node drawer accessible from every page. Existing attachment, project/branch, save, queue and review controls remain available. Finish exposes saved processing inventories and Deliver exposes saved output downloads; their new generation/processing/export commands are still pending.
+- Added pointer and keyboard resizing for the media pool, inspector, source viewer and timeline, panel visibility controls, and per-page reset. Browser preferences retain page geometry independently. Compact windows temporarily collapse side panels without overwriting their saved visibility. Manually reopening a panel makes space for it. Corrupt or unavailable layout storage falls back to usable defaults.
+- Source previews images, audio, generated takes, picture alternates and saved processing outputs. Its untrimmed clock and WAV sidecar are separate from the saved sequence and project soundtrack. Preview selection does not change the final cut, generation checkpoint or program position. Playing a source, program or A/B take pauses the other monitors; page changes and hidden panels stop their media.
+- The sequence player remains mounted across pages and keeps its playhead and preview audio/caption settings. Timeline seeking still returns to the saved sequence. Source selection clears on server, attached workflow, project, Plan or branch changes, including when another workflow uses the same project name.
+- Asset fields and take comparison state remain mounted after first opening their page. Filtering and page changes preserve in-session asset edits, while native catalog refreshes retain the existing conflict checks. Workspace preferences do not persist asset drafts, media files or the playhead across browser reloads.
+
+Validation: final 0.5.4 production build passed; 34 frontend unit tests and 79 adapter/proxy tests passed. The full browser suite passed 66 cases, followed by 28 affected cases after the attachment-identity cleanup and resize limits, including one new same-project workflow-switch case (67 distinct cases). The final compact layout pass reran all 13 workspace/editor cases successfully and asserts that program audio controls fit inside the viewer at 1280×720. The resulting source/sequence screenshot was inspected; both monitors, playback/audio controls, picture/audio timeline lanes and footer are visible. The 990-pixel responsive and 768-pixel editor checks also pass. Tests use synthetic media and a mock ComfyUI server.
+
+No production project was modified and no GPU generation was queued. The native branch interface remains an open draft in H3 PR #57 when rechecked for this release. M0 and M1 remain in progress; the representative native production trial and complete one-scene generation/review/assembly path are next.
 
 ## Source contracts inspected
 
@@ -97,4 +109,4 @@ The browser suite was run with `PLAYWRIGHT_BROWSERS_PATH=/tmp/sceneweaver-playwr
 
 ## Later milestones
 
-M1–M8 remain open. M1 will bring the workspace shell, core branch controls and first one-scene generation/review/delivery cycle. No milestone is complete merely because its controls can be represented in the generic inspector.
+M1–M8 remain open. M1 has the workspace shell and conditional core branch controls, and still needs the validated one-scene generation/review/delivery cycle. No milestone is complete merely because its controls can be represented in the generic inspector or assigned a page.

@@ -22,8 +22,10 @@ test('follows branch clips and processed outputs without using Original media', 
   await expect(companion.getByText('Original upscale', { exact: false })).toHaveCount(0);
   await companion.screenshot({ path: 'test-results/branch-processing.png', fullPage: true });
   await companion.getByRole('button', { name: 'Preview processed take' }).click();
-  await expect(companion.locator('.viewer-canvas video')).toHaveAttribute('src', /second-derope.webm/);
+  await expect(companion.locator('.source-canvas video')).toHaveAttribute('src', /second-derope.webm/);
+  await expect(companion.locator('.viewer-canvas video')).toHaveAttribute('src', /older.webm/);
   await switchToOriginal(page);
+  await expect(companion.locator('.source-canvas video')).toHaveCount(0);
   await expect(companion.getByLabel('Working branch')).toContainText('Original');
   await expect(companion.locator('.viewer-canvas video')).toHaveAttribute('src', /final-alt.webm/);
 });

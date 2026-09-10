@@ -6,10 +6,10 @@ test('edits full-length audio bindings and captions without dropping other nativ
   await page.goto(`${target}/test/live`); await page.waitForFunction(() => Boolean((window as any).testComfy));
   const popup = page.waitForEvent('popup'); await page.getByRole('button', { name: 'Open companion' }).click(); const companion = await popup;
   await expect(companion.getByText('Attached to live workflow', { exact: true })).toBeVisible();
-  await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
+  await companion.locator('.workspace-navigation').getByRole('button', { name: 'Media', exact: true }).click();
   await companion.getByLabel('Filter asset type').selectOption('audio');
   await companion.getByLabel('Search project assets').fill('score');
-  const card = companion.locator('.asset-card'); await expect(card).toHaveCount(1);
+  const card = companion.locator('.asset-card:visible'); await expect(card).toHaveCount(1);
   await card.getByLabel('Vocals · lip-sync driver for score').selectOption('vocal-stem');
   await card.getByLabel('Instrumental · optional backing for score').selectOption('instrumental-stem');
   await card.getByRole('button', { name: 'Apply audio tracks', exact: true }).click();

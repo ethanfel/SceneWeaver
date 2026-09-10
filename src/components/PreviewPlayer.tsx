@@ -4,15 +4,16 @@ import type { PlaybackSegment, PreviewMedia, SubtitleCue } from '../types';
 import { timecode } from '../lib/h3';
 import { sequenceDuration, sequenceSpan, subtitleAt, type SequenceEntry } from '../lib/playback';
 
-export type PlayerControls = { toggle: () => void; seekSequence: (seconds: number) => void };
+export type PlayerControls = { toggle: () => void; pause: () => void; seekSequence: (seconds: number) => void };
 type Props = {
   media: PreviewMedia; segment?: PlaybackSegment; entries: SequenceEntry[];
   controls: RefObject<PlayerControls | null>; selectionKey: number; isolated: boolean;
   sourceUrl: string; sourceSeek: number; cues: SubtitleCue[]; subtitleOffset: number; captionsDefault: boolean;
   previous?: () => void; next?: () => void; onTime: (seconds: number) => void; onScene: (index: number) => void;
   report: (message: string) => void; attach: () => void; hasScene: boolean;
+  active?: boolean; onPlay?: () => void;
 };
-export function PreviewPlayer({ media, segment, entries, controls, selectionKey, isolated, sourceUrl, sourceSeek, cues, subtitleOffset, captionsDefault, previous, next, onTime, onScene, report, attach, hasScene }: Props) {
+export function PreviewPlayer({ media, segment, entries, controls, selectionKey, isolated, sourceUrl, sourceSeek, cues, subtitleOffset, captionsDefault, previous, next, onTime, onScene, report, attach, hasScene, active: visible = true, onPlay }: Props) {
   const video = useRef<HTMLVideoElement>(null), generated = useRef<HTMLAudioElement>(null), soundtrack = useRef<HTMLAudioElement>(null), surface = useRef<HTMLDivElement>(null);
   const [sequence, setSequence] = useState(!isolated && Boolean(segment));
   const [clip, setClip] = useState({ media, segment });
@@ -80,9 +81,9 @@ export function PreviewPlayer({ media, segment, entries, controls, selectionKey,
     if (target >= usableDuration) stop();
   };
   const toggle = () => {
-    if (!canPlay) return;
+    if (!canPlay || !visible) return;
     if (intent.current) { stop(); return; }
-    setAudioError('');
+    onPlay?.(); setAudioError('');
     if (cursor.current >= usableDuration - .01) seek(0);
     intent.current = true; setPlaying(true); sync(true); startVideo();
   };
@@ -120,7 +121,8 @@ export function PreviewPlayer({ media, segment, entries, controls, selectionKey,
     setSequence(true); cursor.current = target; setPosition(target); onTime(target);
     const entry = sequenceSpan(entries, target)?.entry; if (entry) onScene(entry.index);
   };
-  useImperativeHandle(controls, () => ({ toggle, seekSequence }));
+  useImperativeHandle(controls, () => ({ toggle, pause: stop, seekSequence }));
+  useLayoutEffect(() => { if (!visible) stop(); }, [visible]);
   useLayoutEffect(() => {
     stop(); setAudioError(''); setClip({ media, segment });
     if (video.current) { try { video.current.currentTime = 0; } catch { /* New media applies the position after loading. */ } }
