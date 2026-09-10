@@ -12,6 +12,44 @@ async function attach(page: Page) {
   return companion;
 }
 const nativeDirection = (page: Page) => page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((n: any) => n.id === '1700').widgets.find((w: any) => w.name === 'plan_json').value).shots[0].prompt);
+test('finds connected production controls and opens their inspector without writing or queueing', async ({ page, request }) => {
+  const companion = await attach(page);
+  await companion.locator('.workflow-binding > summary').click();
+  await companion.locator('.production-roles > summary').click();
+  const loop = companion.locator('.production-roles .role-row').filter({ has: companion.getByText('Generation loops', { exact: true }) });
+  await expect(loop).toContainText('Connected');
+  await expect(loop).toContainText('#1701');
+  await loop.getByRole('button').click();
+  await expect(companion.getByRole('button', { name: 'Node settings', exact: true })).toHaveClass('active');
+  await expect(companion.locator('.inspector')).toContainText('1701');
+  await companion.locator('.workflow-binding > summary').click();
+  await companion.locator('.integration-capabilities > summary').click();
+  const capability = companion.locator('.integration-capabilities .role-row').filter({ hasText: 'Generate selected scene / range' });
+  await expect(capability).toContainText('Unavailable');
+  await expect(companion.locator('.integration-capabilities')).toContainText('H3: Not reported');
+  expect(await page.evaluate(() => (window as any).nativeCallbacks)).toBe(0);
+  expect((await (await request.get('/comfy/test/state')).json()).submissions).toEqual([]);
+});
+
+test('keeps independently pinned delivery sources outside the selected Plan association', async ({ page }) => {
+  const companion = await attach(page);
+  await page.evaluate(() => {
+    const graph = (window as any).testComfy.graph;
+    graph._nodes.push({ id: 'pinned', type: 'MiniMaxH3ChainCheckpointManager', title: 'Pinned checkpoint source', graph, widgets: [{ name: 'selection_json', value: '{}' }], inputs: [{ name: 'plan', link: 80001 }] });
+    graph.links[80001] = { origin_id: '1700', origin_slot: 0 };
+    graph.links[80002] = { origin_id: 'pinned', origin_slot: 0 };
+    graph._nodes.find((node: any) => node.id === '1706').inputs.find((input: any) => input.name === 'manifest').link = 80002;
+  });
+  await companion.locator('.workflow-binding > summary').click();
+  await companion.locator('.unassigned-roles > summary').click();
+  await expect(companion.locator('.unassigned-roles')).toContainText('pinned independently of its authoring Plan');
+  await companion.locator('.production-roles > summary').click();
+  const delivery = companion.locator('.production-roles .role-row').filter({ hasText: 'Assembly / chapter delivery' });
+  await expect(delivery).toContainText('No connected node');
+  const checkpoints = companion.locator('.production-roles .role-row').filter({ hasText: 'Checkpoint managers' });
+  await expect(checkpoints).toContainText('Pinned checkpoint source');
+});
+
 test('requires an explicit production Plan when another authoring Plan appears', async ({ page }) => {
   const companion = await attach(page);
   await page.evaluate(() => {
@@ -74,8 +112,9 @@ test('edits the wired Carousel through Get/Set even when another Carousel has th
     graph.links[90002] = { origin_id: 'get-assets', origin_slot: 0 };
     graph._nodes.find((node: any) => node.id === '1700').inputs.push({ name: 'project_assets', link: 90002 });
   });
-  await companion.locator('.workflow-binding summary').click();
+  await companion.locator('.workflow-binding > summary').click();
   await expect(companion.locator('.binding-details')).toContainText('Bound project assets');
+  await companion.locator('.workflow-binding > summary').click();
   await companion.locator('.viewer-tabs').getByRole('button', { name: 'Assets', exact: true }).click();
   await companion.getByRole('textbox', { name: 'Tag for hero', exact: true }).fill('bound-hero');
   await companion.getByRole('button', { name: 'Apply', exact: true }).click();

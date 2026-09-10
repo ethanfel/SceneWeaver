@@ -1,0 +1,1857 @@
+{
+  "description": "Sanitized top-level topology from upstream recipes. Only node types, modes and links are retained; placeholder Plans/project names are not runnable workflows. Backend main is not a released stable-version validation.",
+  "cases": [
+    {
+      "name": "main T2V Studio",
+      "source": {
+        "commit": "336ee236de09a92dd25b006bbd97b57f82e3639a",
+        "path": "example_workflows/T2V Studio - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "UNETLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "CLIPLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "KSamplerSelect",
+          "inputs": {},
+          "mode": 0
+        },
+        "4": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "MiniMaxH3ChainLoopStart",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "MiniMaxH3ChainCurrent",
+          "inputs": {
+            "state": [
+              "6",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "25",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "9": {
+          "class_type": "RandomNoise",
+          "inputs": {
+            "noise_seed": [
+              "7",
+              5
+            ]
+          },
+          "mode": 0
+        },
+        "10": {
+          "class_type": "MiniMaxH3ImageToVideo",
+          "inputs": {
+            "clip": [
+              "2",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "prompt": [
+              "7",
+              4
+            ],
+            "width": [
+              "7",
+              8
+            ],
+            "height": [
+              "7",
+              9
+            ],
+            "length": [
+              "7",
+              6
+            ]
+          },
+          "mode": 0
+        },
+        "11": {
+          "class_type": "MiniMaxH3ChainContext",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "conditioning": [
+              "10",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "latent": [
+              "10",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "12": {
+          "class_type": "MiniMaxH3SigmaShift",
+          "inputs": {
+            "model": [
+              "21",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "13": {
+          "class_type": "BasicGuider",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "conditioning": [
+              "11",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "14": {
+          "class_type": "BasicScheduler",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "steps": [
+              "7",
+              7
+            ]
+          },
+          "mode": 0
+        },
+        "15": {
+          "class_type": "SamplerCustomAdvanced",
+          "inputs": {
+            "noise": [
+              "9",
+              0
+            ],
+            "guider": [
+              "13",
+              0
+            ],
+            "sampler": [
+              "3",
+              0
+            ],
+            "sigmas": [
+              "14",
+              0
+            ],
+            "latent_image": [
+              "11",
+              3
+            ]
+          },
+          "mode": 0
+        },
+        "16": {
+          "class_type": "VAEDecode",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "17": {
+          "class_type": "VAEDecodeAudio",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "18": {
+          "class_type": "MiniMaxH3LoopTrim",
+          "inputs": {
+            "images": [
+              "16",
+              0
+            ],
+            "trim_frames": [
+              "11",
+              1
+            ],
+            "audio": [
+              "17",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "19": {
+          "class_type": "MiniMaxH3ChainSegmentSave",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ],
+            "images_with_overlap": [
+              "18",
+              2
+            ]
+          },
+          "mode": 0
+        },
+        "20": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "26",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "21": {
+          "class_type": "ModelAttentionBackend",
+          "inputs": {
+            "model": [
+              "1",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "22": {
+          "class_type": "MiniMaxH3ChainRichScenePromptEditor",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "23": {
+          "class_type": "MiniMaxH3ChainPlanModern",
+          "inputs": {
+            "chain_policy": [
+              "28",
+              0
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "24": {
+          "class_type": "MiniMaxH3ChainPlanStudio",
+          "inputs": {
+            "plan": [
+              "23",
+              0
+            ],
+            "tagged_references": [
+              "29",
+              1
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "25": {
+          "class_type": "MiniMaxH3ChainManifestLoad",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "26": {
+          "class_type": "MiniMaxH3ChainLoopEnd",
+          "inputs": {
+            "flow": [
+              "6",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "segment": [
+              "27",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "27": {
+          "class_type": "MiniMaxH3ChainReview",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "segment": [
+              "19",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "28": {
+          "class_type": "MiniMaxH3GenerationProfile",
+          "inputs": {},
+          "mode": 0
+        },
+        "29": {
+          "class_type": "MiniMaxH3ProjectAssetManager",
+          "inputs": {
+            "run_name": "fixture"
+          },
+          "mode": 0
+        },
+        "30": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "31": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    },
+    {
+      "name": "main Ref2V Studio Source Audio",
+      "source": {
+        "commit": "336ee236de09a92dd25b006bbd97b57f82e3639a",
+        "path": "example_workflows/Ref2V Studio Source Audio - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "UNETLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "CLIPLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "KSamplerSelect",
+          "inputs": {},
+          "mode": 0
+        },
+        "4": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "MiniMaxH3ChainLoopStart",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "MiniMaxH3ChainCurrent",
+          "inputs": {
+            "state": [
+              "6",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "22",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "9": {
+          "class_type": "RandomNoise",
+          "inputs": {
+            "noise_seed": [
+              "7",
+              5
+            ]
+          },
+          "mode": 0
+        },
+        "10": {
+          "class_type": "MiniMaxH3TaggedReferenceToVideo",
+          "inputs": {
+            "clip": [
+              "2",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "audio_vae": [
+              "5",
+              0
+            ],
+            "references": [
+              "29",
+              1
+            ],
+            "clip_index": [
+              "7",
+              1
+            ],
+            "clip_count": [
+              "7",
+              2
+            ],
+            "prompt": [
+              "7",
+              4
+            ],
+            "width": [
+              "7",
+              8
+            ],
+            "height": [
+              "7",
+              9
+            ],
+            "length": [
+              "7",
+              6
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "11": {
+          "class_type": "MiniMaxH3ChainContext",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "conditioning": [
+              "10",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "latent": [
+              "10",
+              1
+            ],
+            "audio_vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "12": {
+          "class_type": "MiniMaxH3SigmaShift",
+          "inputs": {
+            "model": [
+              "21",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "13": {
+          "class_type": "BasicGuider",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "conditioning": [
+              "11",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "14": {
+          "class_type": "BasicScheduler",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "steps": [
+              "7",
+              7
+            ]
+          },
+          "mode": 0
+        },
+        "15": {
+          "class_type": "SamplerCustomAdvanced",
+          "inputs": {
+            "noise": [
+              "9",
+              0
+            ],
+            "guider": [
+              "13",
+              0
+            ],
+            "sampler": [
+              "3",
+              0
+            ],
+            "sigmas": [
+              "14",
+              0
+            ],
+            "latent_image": [
+              "11",
+              3
+            ]
+          },
+          "mode": 0
+        },
+        "16": {
+          "class_type": "VAEDecode",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "17": {
+          "class_type": "VAEDecodeAudio",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "18": {
+          "class_type": "MiniMaxH3LoopTrim",
+          "inputs": {
+            "images": [
+              "16",
+              0
+            ],
+            "trim_frames": [
+              "11",
+              1
+            ],
+            "audio": [
+              "17",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "19": {
+          "class_type": "MiniMaxH3ChainSegmentSave",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ],
+            "images_with_overlap": [
+              "18",
+              2
+            ]
+          },
+          "mode": 0
+        },
+        "20": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "21": {
+          "class_type": "ModelAttentionBackend",
+          "inputs": {
+            "model": [
+              "1",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "22": {
+          "class_type": "MiniMaxH3ChainManifestLoad",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "23": {
+          "class_type": "MiniMaxH3ChainReview",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "segment": [
+              "19",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "24": {
+          "class_type": "MiniMaxH3ChainLoopEnd",
+          "inputs": {
+            "flow": [
+              "6",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "segment": [
+              "23",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "25": {
+          "class_type": "MiniMaxH3ChainPlanStudio",
+          "inputs": {
+            "plan": [
+              "27",
+              0
+            ],
+            "tagged_references": [
+              "29",
+              1
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "26": {
+          "class_type": "MiniMaxH3ChainRichScenePromptEditor",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "27": {
+          "class_type": "MiniMaxH3ChainPlanModern",
+          "inputs": {
+            "chain_policy": [
+              "28",
+              0
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "28": {
+          "class_type": "MiniMaxH3GenerationProfile",
+          "inputs": {},
+          "mode": 0
+        },
+        "29": {
+          "class_type": "MiniMaxH3ProjectAssetManager",
+          "inputs": {
+            "run_name": "fixture"
+          },
+          "mode": 0
+        },
+        "30": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "31": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    },
+    {
+      "name": "main Deferred Upscale - SeedVR2 Full Chain",
+      "source": {
+        "commit": "336ee236de09a92dd25b006bbd97b57f82e3639a",
+        "path": "example_workflows/Deferred Upscale - SeedVR2 Full Chain - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "MiniMaxH3ChainLatentVideoAdapter",
+          "inputs": {
+            "manifest": [
+              "1",
+              0
+            ],
+            "video_vae": [
+              "2",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "4": {
+          "class_type": "SeedVR2LoadDiTModel",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "SeedVR2LoadVAEModel",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "SeedVR2VideoPathUpscaler",
+          "inputs": {
+            "video": [
+              "3",
+              0
+            ],
+            "dit": [
+              "4",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "SaveVideo",
+          "inputs": {
+            "video": [
+              "6",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    },
+    {
+      "name": "nightly T2V Studio",
+      "source": {
+        "commit": "cdbd44d195bad589ee2fbfb7657bb99261962a94",
+        "path": "example_workflows/T2V Studio - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "UNETLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "CLIPLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "KSamplerSelect",
+          "inputs": {},
+          "mode": 0
+        },
+        "4": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "MiniMaxH3ChainLoopStart",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "MiniMaxH3ChainCurrent",
+          "inputs": {
+            "state": [
+              "6",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "25",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "9": {
+          "class_type": "RandomNoise",
+          "inputs": {
+            "noise_seed": [
+              "7",
+              5
+            ]
+          },
+          "mode": 0
+        },
+        "10": {
+          "class_type": "MiniMaxH3ImageToVideo",
+          "inputs": {
+            "clip": [
+              "2",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "prompt": [
+              "7",
+              4
+            ],
+            "width": [
+              "7",
+              8
+            ],
+            "height": [
+              "7",
+              9
+            ],
+            "length": [
+              "7",
+              6
+            ]
+          },
+          "mode": 0
+        },
+        "11": {
+          "class_type": "MiniMaxH3ChainContext",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "conditioning": [
+              "10",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "latent": [
+              "10",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "12": {
+          "class_type": "MiniMaxH3SigmaShift",
+          "inputs": {
+            "model": [
+              "21",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "13": {
+          "class_type": "BasicGuider",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "conditioning": [
+              "11",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "14": {
+          "class_type": "BasicScheduler",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "steps": [
+              "7",
+              7
+            ]
+          },
+          "mode": 0
+        },
+        "15": {
+          "class_type": "SamplerCustomAdvanced",
+          "inputs": {
+            "noise": [
+              "9",
+              0
+            ],
+            "guider": [
+              "13",
+              0
+            ],
+            "sampler": [
+              "3",
+              0
+            ],
+            "sigmas": [
+              "14",
+              0
+            ],
+            "latent_image": [
+              "11",
+              3
+            ]
+          },
+          "mode": 0
+        },
+        "16": {
+          "class_type": "VAEDecode",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "17": {
+          "class_type": "VAEDecodeAudio",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "18": {
+          "class_type": "MiniMaxH3LoopTrim",
+          "inputs": {
+            "images": [
+              "16",
+              0
+            ],
+            "trim_frames": [
+              "11",
+              1
+            ],
+            "audio": [
+              "17",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "19": {
+          "class_type": "MiniMaxH3ChainSegmentSave",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ],
+            "images_with_overlap": [
+              "18",
+              2
+            ]
+          },
+          "mode": 0
+        },
+        "20": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "26",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "21": {
+          "class_type": "ModelAttentionBackend",
+          "inputs": {
+            "model": [
+              "1",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "22": {
+          "class_type": "MiniMaxH3ChainRichScenePromptEditor",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "23": {
+          "class_type": "MiniMaxH3ChainPlanModern",
+          "inputs": {
+            "chain_policy": [
+              "28",
+              0
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "24": {
+          "class_type": "MiniMaxH3ChainPlanStudio",
+          "inputs": {
+            "plan": [
+              "23",
+              0
+            ],
+            "tagged_references": [
+              "29",
+              1
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "25": {
+          "class_type": "MiniMaxH3ChainManifestLoad",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "26": {
+          "class_type": "MiniMaxH3ChainLoopEnd",
+          "inputs": {
+            "flow": [
+              "6",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "segment": [
+              "27",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "27": {
+          "class_type": "MiniMaxH3ChainReview",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "segment": [
+              "19",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "28": {
+          "class_type": "MiniMaxH3GenerationProfile",
+          "inputs": {},
+          "mode": 0
+        },
+        "29": {
+          "class_type": "MiniMaxH3ProjectAssetManager",
+          "inputs": {
+            "run_name": "fixture"
+          },
+          "mode": 0
+        },
+        "30": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {
+            "plan": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "31": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    },
+    {
+      "name": "nightly Ref2V Studio Source Audio",
+      "source": {
+        "commit": "cdbd44d195bad589ee2fbfb7657bb99261962a94",
+        "path": "example_workflows/Ref2V Studio Source Audio - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "UNETLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "CLIPLoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "KSamplerSelect",
+          "inputs": {},
+          "mode": 0
+        },
+        "4": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "MiniMaxH3ChainLoopStart",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "MiniMaxH3ChainCurrent",
+          "inputs": {
+            "state": [
+              "6",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "22",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "9": {
+          "class_type": "RandomNoise",
+          "inputs": {
+            "noise_seed": [
+              "7",
+              5
+            ]
+          },
+          "mode": 0
+        },
+        "10": {
+          "class_type": "MiniMaxH3TaggedReferenceToVideo",
+          "inputs": {
+            "clip": [
+              "2",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "audio_vae": [
+              "5",
+              0
+            ],
+            "references": [
+              "29",
+              1
+            ],
+            "clip_index": [
+              "7",
+              1
+            ],
+            "clip_count": [
+              "7",
+              2
+            ],
+            "prompt": [
+              "7",
+              4
+            ],
+            "width": [
+              "7",
+              8
+            ],
+            "height": [
+              "7",
+              9
+            ],
+            "length": [
+              "7",
+              6
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "11": {
+          "class_type": "MiniMaxH3ChainContext",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "conditioning": [
+              "10",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ],
+            "latent": [
+              "10",
+              1
+            ],
+            "audio_vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "12": {
+          "class_type": "MiniMaxH3SigmaShift",
+          "inputs": {
+            "model": [
+              "21",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "13": {
+          "class_type": "BasicGuider",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "conditioning": [
+              "11",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "14": {
+          "class_type": "BasicScheduler",
+          "inputs": {
+            "model": [
+              "12",
+              0
+            ],
+            "steps": [
+              "7",
+              7
+            ]
+          },
+          "mode": 0
+        },
+        "15": {
+          "class_type": "SamplerCustomAdvanced",
+          "inputs": {
+            "noise": [
+              "9",
+              0
+            ],
+            "guider": [
+              "13",
+              0
+            ],
+            "sampler": [
+              "3",
+              0
+            ],
+            "sigmas": [
+              "14",
+              0
+            ],
+            "latent_image": [
+              "11",
+              3
+            ]
+          },
+          "mode": 0
+        },
+        "16": {
+          "class_type": "VAEDecode",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "4",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "17": {
+          "class_type": "VAEDecodeAudio",
+          "inputs": {
+            "samples": [
+              "15",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "18": {
+          "class_type": "MiniMaxH3LoopTrim",
+          "inputs": {
+            "images": [
+              "16",
+              0
+            ],
+            "trim_frames": [
+              "11",
+              1
+            ],
+            "audio": [
+              "17",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "19": {
+          "class_type": "MiniMaxH3ChainSegmentSave",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ],
+            "images_with_overlap": [
+              "18",
+              2
+            ]
+          },
+          "mode": 0
+        },
+        "20": {
+          "class_type": "MiniMaxH3ChainAssemble",
+          "inputs": {
+            "manifest": [
+              "24",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "21": {
+          "class_type": "ModelAttentionBackend",
+          "inputs": {
+            "model": [
+              "1",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "22": {
+          "class_type": "MiniMaxH3ChainManifestLoad",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 2
+        },
+        "23": {
+          "class_type": "MiniMaxH3ChainReview",
+          "inputs": {
+            "state": [
+              "7",
+              0
+            ],
+            "segment": [
+              "19",
+              0
+            ],
+            "audio": [
+              "18",
+              1
+            ]
+          },
+          "mode": 0
+        },
+        "24": {
+          "class_type": "MiniMaxH3ChainLoopEnd",
+          "inputs": {
+            "flow": [
+              "6",
+              0
+            ],
+            "state": [
+              "7",
+              0
+            ],
+            "images": [
+              "18",
+              0
+            ],
+            "sampled_latent": [
+              "15",
+              0
+            ],
+            "segment": [
+              "23",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "25": {
+          "class_type": "MiniMaxH3ChainPlanStudio",
+          "inputs": {
+            "plan": [
+              "27",
+              0
+            ],
+            "tagged_references": [
+              "29",
+              1
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "26": {
+          "class_type": "MiniMaxH3ChainRichScenePromptEditor",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "27": {
+          "class_type": "MiniMaxH3ChainPlanModern",
+          "inputs": {
+            "chain_policy": [
+              "28",
+              0
+            ],
+            "project_assets": [
+              "29",
+              0
+            ],
+            "run_name": "fixture",
+            "plan_json": "{\"shots\":[]}"
+          },
+          "mode": 0
+        },
+        "28": {
+          "class_type": "MiniMaxH3GenerationProfile",
+          "inputs": {},
+          "mode": 0
+        },
+        "29": {
+          "class_type": "MiniMaxH3ProjectAssetManager",
+          "inputs": {
+            "run_name": "fixture"
+          },
+          "mode": 0
+        },
+        "30": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {
+            "plan": [
+              "25",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "31": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    },
+    {
+      "name": "nightly Deferred Upscale - SeedVR2 Full Chain",
+      "source": {
+        "commit": "cdbd44d195bad589ee2fbfb7657bb99261962a94",
+        "path": "example_workflows/Deferred Upscale - SeedVR2 Full Chain - MiniMax H3 0.6.json"
+      },
+      "nodes": {
+        "1": {
+          "class_type": "MiniMaxH3ChainCheckpointManager",
+          "inputs": {},
+          "mode": 0
+        },
+        "2": {
+          "class_type": "VAELoader",
+          "inputs": {},
+          "mode": 0
+        },
+        "3": {
+          "class_type": "MiniMaxH3ChainLatentVideoAdapter",
+          "inputs": {
+            "manifest": [
+              "1",
+              0
+            ],
+            "video_vae": [
+              "2",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "4": {
+          "class_type": "SeedVR2LoadDiTModel",
+          "inputs": {},
+          "mode": 0
+        },
+        "5": {
+          "class_type": "SeedVR2LoadVAEModel",
+          "inputs": {},
+          "mode": 0
+        },
+        "6": {
+          "class_type": "SeedVR2VideoPathUpscaler",
+          "inputs": {
+            "video": [
+              "3",
+              0
+            ],
+            "dit": [
+              "4",
+              0
+            ],
+            "vae": [
+              "5",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "7": {
+          "class_type": "SaveVideo",
+          "inputs": {
+            "video": [
+              "6",
+              0
+            ]
+          },
+          "mode": 0
+        },
+        "8": {
+          "class_type": "Note",
+          "inputs": {},
+          "mode": 0
+        }
+      }
+    }
+  ]
+}

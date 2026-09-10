@@ -5,6 +5,8 @@ import { workingBranch, branchPath, verifyBranch } from './branches-core.mjs';
 import { resolvePlanBinding, workflowBindings } from './binding-core.mjs';
 import { saveWorkflowFile, workflowFileStatus } from './workflow-file.mjs';
 import { createCommandSession } from './command-session.mjs';
+import { discoverH3 } from './h3-discovery.mjs';
+import { productionRoles } from './workflow-roles.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -12,7 +14,7 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics } = {}) {
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
@@ -66,7 +68,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
           }
           else inputErrors.push(input.name);
         }
-        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable, inputErrors, inputSources, scopeActive,
+        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable, inputErrors, inputSources, scopeActive, virtual: Boolean(node.isVirtualNode || node.subgraph), requiresOwnership: Boolean(widget(node, 'ownership_json')),
           ...((node.comfyClass || node.type) === 'GetNode' ? { routing: { busAncestors: typeof node.resolveVirtualOutput === 'function' } } : {}) };
         refs.set(id, node);
         if (node.subgraph) {
@@ -83,9 +85,9 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
-    return { ...document, revision, workflowFile: workflowFileStatus(app) };
+    return { ...document, revision, workflowFile: workflowFileStatus(app), productionBindings: document.projectBindings.plans.map(plan => productionRoles(nodes, plan.planId)) };
   }
   const assertCurrent = command => {
     const current = snapshot();
@@ -304,61 +306,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
   };
 }
 
-async function h3Adapters(api) {
-  try {
-    const paths = await (await api.fetchApi('/extensions')).json();
-    const path = paths.find(path => path.endsWith('/h3_project_asset_manager.js'));
-    if (!path) return {};
-    const source = await (await fetch(path)).text(), base = new URL(path, location.href);
-    const ownershipPath = source.match(/["'](\.\/h3_project_ownership\.mjs[^"']*)["']/)?.[1];
-    const syncPath = source.match(/["'](\.\/h3_project_asset_sync_core\.mjs[^"']*)["']/)?.[1];
-    const ownership = ownershipPath ? await import(new URL(ownershipPath, base).href) : {};
-    const sync = syncPath ? await import(new URL(syncPath, base).href) : {};
-    const adapters = { ownershipOptions: ownership.projectMutationOptions, publishCatalog: sync.publishProjectAssetCatalogChanged ? (node, project, catalog) => {
-      const value = widget(node, 'catalog_json');
-      if (value) { value.value = JSON.stringify(sync.serializedProjectAssetCatalog?.(catalog, project) || catalog); value.callback?.(value.value); }
-      sync.publishProjectAssetCatalogChanged(node, catalog);
-    } : undefined };
-    const audioPath = source.match(/["'](\.\/h3_project_asset_editor_core\.mjs[^"']*)["']/)?.[1];
-    if (audioPath) {
-      try { const audio = await import(new URL(audioPath, base).href); if (typeof audio.projectAudioTrackBindings === 'function') adapters.audioTracks = audio; } catch { /* Older H3 keeps ordinary asset controls. */ }
-    }
-    const studioPath = paths.find(path => path.endsWith('/h3_chain_plan_studio.js'));
-    if (studioPath) {
-      const studio = await (await fetch(studioPath)).text();
-      adapters.workingBranches = studio.includes('h3_working_branches.mjs') && studio.includes('working_branch_id');
-      adapters.finalCut = studio.includes('base_revision:') && studio.includes('/minimax_h3_context_loop/editorial');
-    }
-    try {
-      const managerPath = paths.find(path => path.endsWith('/h3_chain_checkpoint_manager.js'));
-      if (managerPath) {
-        const managerSource = await (await fetch(managerPath)).text(), managerBase = new URL(managerPath, location.href);
-        const nativeImport = async name => {
-          const reference = managerSource.match(new RegExp(`["'](\\./${name.replaceAll('.', '\\.')}[^"']*)["']`))?.[1];
-          if (!reference) throw new Error(`H3 does not expose ${name}`);
-          return import(new URL(reference, managerBase).href);
-        };
-        const [core, plan, review, restore, prompts] = await Promise.all(['h3_checkpoint_manager_core.mjs', 'h3_chain_plan_core.mjs', 'h3_chain_review_core.mjs', 'h3_plan_restore_core.mjs', 'h3_prompt_companion_sync.mjs'].map(nativeImport));
-        if ([core.checkpointActivationMode, core.checkpointRevisionLineage, plan.parsePlanJson, plan.planToJson, review.applyCheckpointRevisionSet, restore.refreshRestoredPlanEditors].every(value => typeof value === 'function')) adapters.checkpoints = {
-          checkpointActivationMode: core.checkpointActivationMode, checkpointRevisionLineage: core.checkpointRevisionLineage,
-          restorePlan: (value, revisions) => plan.planToJson(review.applyCheckpointRevisionSet(plan.parsePlanJson(String(value)), revisions, { useEffectivePrompts: true, useTipSharedPrompt: true })),
-          refreshPlan: (node, revisions) => {
-            restore.refreshRestoredPlanEditors(node);
-            const document = plan.parsePlanJson(String(widget(node, 'plan_json').value));
-            for (const item of revisions) prompts.publishCompanionPrompt?.(node, node, item.scene - 1, plan.promptValueToText(document.shots[item.scene - 1]?.prompt));
-          },
-        };
-      }
-    } catch { /* Existing asset and final-cut actions remain available. */ }
-    return adapters;
-  } catch { return {}; }
-}
-
 export async function launch(child, companionOrigin = new URL(import.meta.url).origin) {
   if (!child) throw new Error('Allow the SceneWeaver window to open, then try again.');
   if (globalThis.__sceneweaverCompanion) globalThis.__sceneweaverCompanion.stop();
   const [{ app }, { api }] = await Promise.all([import(new URL('/scripts/app.js', location.origin).href), import(new URL('/scripts/api.js', location.origin).href)]);
-  const adapter = createAdapter(app, api, await h3Adapters(api));
+  const adapter = createAdapter(app, api, await discoverH3(api));
   const session = token(); let stopped = false, ready = false;
   const send = message => { if (!stopped && !child.closed) child.postMessage({ protocol: PROTOCOL, session, ...message }, companionOrigin); };
   const commands = createCommandSession(adapter, receipt => send({ kind: 'receipt', receipt }));

@@ -7,6 +7,7 @@ const graphScope = id => id.slice(0, id.lastIndexOf('/') + 1);
 const live = node => (node.scopeActive ?? node._meta?.scopeActive) !== false && ![2, 4].includes(Number(node.mode ?? node._meta?.mode ?? 0));
 const effectiveInputs = node => ({ ...node.inputs, ...(node.inputSources ?? node._meta?.inputSources) });
 const failure = (reason, path = [], status = 'unresolved') => ({ status, reason, path });
+export { link as isConnection, live as isActiveNode, effectiveInputs };
 
 export function traceSource(nodes, source) {
   const path = [], seen = new Set();
@@ -57,19 +58,42 @@ export function planChoices(nodes) {
     && !(node.class_type === STUDIO && (link(node.inputs.plan) || (node.inputErrors ?? node._meta?.inputErrors)?.includes('plan'))));
 }
 
+// Native Plan outputs are carried through these authoring/presentation nodes.
+// This is data provenance only: a Studio or editor can change the effective
+// Plan, so the path must remain visible to future authoring/preflight actions.
+export function tracePlanSource(nodes, source) {
+  const path = [], seen = new Set();
+  let current = source;
+  while (path.length < 128) {
+    const traced = traceSource(nodes, current);
+    path.push(...traced.path);
+    if (traced.status !== 'resolved') return { ...traced, path };
+    const { nodeId: id, slot } = traced, node = nodes[id];
+    if (seen.has(id)) return failure('The Plan connection contains a cycle.', path);
+    seen.add(id);
+    if (slot !== 0) return failure(`Node ${id} output ${slot} is not a supported Plan output.`, path);
+    const carriesPlan = ['MiniMaxH3ChainScenePromptEditor', 'MiniMaxH3ChainRichScenePromptEditor', 'MiniMaxH3ChainPreflight', STUDIO].includes(node.class_type);
+    if (carriesPlan && (node.inputErrors ?? node._meta?.inputErrors)?.includes('plan')) return failure(`Node ${id} has a broken Plan connection.`, path);
+    if (carriesPlan && link(effectiveInputs(node).plan)) { current = effectiveInputs(node).plan; continue; }
+    if (PLAN_TYPES.includes(node.class_type)) return { ...traced, path };
+    return failure(`Node ${id} (${node.class_type}) has no supported upstream Plan.`, path);
+  }
+  return failure('The Plan connection exceeds the inspection limit.', path);
+}
+
 export function resolvePlanBinding(nodes, planId) {
   const node = nodes[planId];
   const result = { planId, project: '', managerId: '', status: 'unresolved', method: '', assetPath: [], studioIds: [], issues: [] };
   if (!node || !PLAN_TYPES.includes(node.class_type)) return { ...result, issues: ['Select an H3 Plan to identify its project.'] };
   if (node.class_type === STUDIO && (node.inputErrors ?? node._meta?.inputErrors)?.includes('plan')) return { ...result, issues: ['The Studio upstream Plan connection is missing.'] };
   if (node.class_type === STUDIO && link(node.inputs.plan)) {
-    const source = traceSource(nodes, effectiveInputs(node).plan);
+    const source = tracePlanSource(nodes, effectiveInputs(node).plan);
     return { ...result, issues: [source.status === 'resolved' && PLAN_TYPES.includes(nodes[source.nodeId]?.class_type)
       ? `This Studio displays upstream Plan ${source.nodeId}. Select that Plan for authoring.`
       : `The Studio upstream Plan cannot be identified. ${source.reason || ''}`.trim()] };
   }
-  result.studioIds = Object.entries(nodes).filter(([, item]) => item.class_type === STUDIO && link(item.inputs.plan)
-    && traceSource(nodes, effectiveInputs(item).plan).nodeId === planId).map(([id]) => id);
+  result.studioIds = Object.entries(nodes).filter(([, item]) => item.class_type === STUDIO && live(item) && link(item.inputs.plan)
+    && tracePlanSource(nodes, effectiveInputs(item).plan).nodeId === planId).map(([id]) => id);
   if (node.class_type === STUDIO) result.studioIds.unshift(planId);
   if (!live(node)) return { ...result, issues: ['The selected Plan or its subgraph is inactive or shared across instances. Its project is not bound for operations.'] };
   if ((node.inputErrors ?? node._meta?.inputErrors)?.includes('project_assets')) return { ...result, issues: ['The Plan has a project-assets connection whose source is missing.'] };

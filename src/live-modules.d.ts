@@ -19,3 +19,17 @@ declare module '*binding-core.mjs' {
   export function resolvePlanBinding(nodes: Record<string, ApiNode | LiveNode>, planId: string): PlanBinding;
   export function workflowBindings(nodes: Record<string, ApiNode | LiveNode>): { version: number; plans: PlanBinding[] };
 }
+declare module '*workflow-roles.mjs' {
+  type ProductionBindings = import('./types').ProductionBindings;
+  type ApiNode = import('./types').ApiNode;
+  type LiveNode = import('./types').LiveNode;
+  export const ROLE_LABELS: Record<string, string>;
+  export function productionRoles(nodes: Record<string, ApiNode | LiveNode>, planId: string): ProductionBindings;
+}
+declare module '*task-capabilities.mjs' {
+  type LiveSnapshot = import('./types').LiveSnapshot;
+  type Schemas = import('./types').Schemas;
+  type TaskCapability = import('./types').TaskCapability;
+  export function planTaskCapabilities(snapshot: LiveSnapshot, planId: string): { version: number; planId: string; tasks: TaskCapability[] };
+  export function unregisteredNodes(snapshot: LiveSnapshot, schemas: Schemas): { nodeId: string; classType: string }[];
+}

@@ -16,6 +16,19 @@ async function attach(page: Page) {
 }
 const take = (page: Page, revision: string) => page.getByRole('article', { name: `Scene 1 take ${revision.repeat(32)}`, exact: true });
 const direction = (page: Page) => page.evaluate(() => JSON.parse((window as any).testComfy.graph._nodes.find((node: any) => node.id === '1700').widgets.find((item: any) => item.name === 'plan_json').value).shots[0].prompt);
+test('a broken audio helper leaves checkpoint and final-cut integrations available and explains the failure', async ({ page }) => {
+  await page.route('**/h3_project_asset_editor_core.mjs*', route => route.fulfill({ status: 200, contentType: 'application/javascript', body: 'throw new Error("Synthetic optional helper failure");' }));
+  const companion = await attach(page);
+  await companion.locator('.workflow-binding > summary').click();
+  await companion.locator('.integration-capabilities > summary').click();
+  const rows = companion.locator('.integration-capabilities .role-row');
+  await expect(rows.filter({ hasText: 'Bind synchronized audio tracks' })).toContainText('Unavailable');
+  await expect(rows.filter({ hasText: 'Choose saved final-cut picture' })).toContainText('Available');
+  await expect(rows.filter({ hasText: 'Preview / restore checkpoint lineage' })).toContainText('Available');
+  await companion.getByText('Discovery evidence', { exact: true }).click();
+  await expect(companion.locator('.integration-capabilities')).toContainText('audioTracks · unavailable');
+  await expect(companion.locator('.integration-capabilities')).toContainText('finalCut · inferred');
+});
 
 test('compares pictures with base audio and saves alternate choices into the native final cut', async ({ page, request }) => {
   const companion = await attach(page);

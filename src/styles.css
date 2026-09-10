@@ -54,3 +54,9 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
   .audio-track,.track-labels>div:last-child{height:32px}
   .audio-track>div{height:25px}
 }
+
+.binding-details{max-height:min(440px,55vh)}.binding-details details{border-top:1px solid #39414a;margin-top:8px}.binding-details details summary{padding:8px 0;font-weight:600}.binding-details .role-row{display:contents}.binding-details dd small{display:block;margin-top:4px;line-height:1.5;color:#a6b2be}.binding-node{max-width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;margin:3px 0}.binding-node small{display:inline!important}.role-status,.task-status{font-size:10px;font-weight:500;color:#a6b2be}.role-status.bound,.task-status.available{color:#a1c9b0}.role-status.multiple,.role-status.shared{color:#dcc192}.binding-issue{border-left:2px solid #817054;padding-left:8px;margin:10px 0}.binding-issue>small{display:block;line-height:1.5}
+
+.workflow-binding{position:relative}.workflow-binding[open]>.binding-details{position:absolute;top:100%;left:0;z-index:35;width:min(720px,calc(100vw - 32px));box-sizing:border-box;background:#22272d;border:1px solid #4a545e;box-shadow:0 12px 28px #0007;padding-top:8px}
+
+.binding-node small{white-space:nowrap;flex-shrink:0}

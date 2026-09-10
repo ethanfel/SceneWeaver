@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.4.0** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.1** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -11,6 +11,8 @@ The active development goal is documented in the [complete workflow parity plan]
 ## Integration foundations (0.5)
 
 The first integration batch adds explicit production Plan selection, shared project binding through supported indirect connections, native saving of existing workflow files, and recoverable action receipts. “Save workflow” is separate from applying a draft or saving H3 branch authoring. Receipt checks never repeat the original action. Refresh the ComfyUI page and reopen SceneWeaver after updating to load the new browser adapter.
+
+In **0.5.1**, expand **Project binding verified → Connected production controls** to inspect the selected Plan's policy, prompt editors, preflight, loop, review, checkpoint and delivery nodes. The report distinguishes multiple targets, shared policies, inactive paths and independent pinned checkpoint manifests. Clicking a node opens its inspector. **Integration capabilities** explains which companion actions are available, what still needs an adapter, and which installed versions are unknown. Helper discovery failures are isolated and reported; one broken audio module no longer hides working checkpoint or asset integrations.
 
 ## September 2026 H3 compatibility update
 
