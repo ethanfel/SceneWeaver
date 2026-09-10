@@ -67,7 +67,7 @@ export function useComfy(runName: string, followProject = false, branchId = 'mai
   }, []);
   const refreshCheckpoints = useCallback(async () => {
     const name = runRef.current, branch = branchRef.current, generation = connectionGeneration.current, requestId = ++checkpointRequest.current;
-    if (!name) { setCheckpoints([]); setEditorial(null); return; }
+    if (!name || !branch) { setCheckpoints([]); setEditorial(null); return; }
     try {
       const result = verifyBranch(await comfy<{ working_branch_id?: string; checkpoints: Checkpoint[]; editorial?: Editorial }>(branchPath(`${H3}/checkpoints?${new URLSearchParams({ run_name: name, include_graph: 'false' })}`, branch)), branch);
       if (requestId === checkpointRequest.current && runRef.current === name && branchRef.current === branch && generation === connectionGeneration.current) { setCheckpointScope(JSON.stringify([name, branch])); setCheckpoints((result.checkpoints || []).map(item => ({ ...item, working_branch_id: branch }))); setEditorial(result.editorial || null); }

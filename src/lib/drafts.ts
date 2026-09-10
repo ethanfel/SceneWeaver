@@ -1,6 +1,6 @@
 import type { LiveSnapshot, WidgetEdit, Workflow } from '../types';
 import { diffInputs } from '../../public/integrations/bridge-core.mjs';
-import { workingBranch } from '../../public/integrations/branches-core.mjs';
+import { planBranchSource, resolvePlanDocument } from '../../public/integrations/plan-source.mjs';
 import { effectiveRunName } from './h3';
 import { liveWorkflow } from './live';
 
@@ -12,9 +12,13 @@ const privateWidget = /ownership|operation_json|catalog_json|api[_ -]?key|passwo
 export function draftScope(server: string, snapshot: LiveSnapshot, planId: string) {
   if (!snapshot.nodes[planId] || !snapshot.workflowId && !snapshot.workflowKey) return '';
   const workflow = liveWorkflow(snapshot);
-  const branch = workingBranch(workflow.prompt[planId]?.inputs);
+  const branch = planBranchSource(snapshot.nodes, planId).id;
+  if (!branch) return '';
+  const source = resolvePlanDocument(snapshot.nodes, planId);
+  const connected = source.nodeId !== planId || source.widget !== 'plan_json' || source.emptyOverride;
+  const sourceScope = connected ? [source.nodeId, source.widget, source.input, source.path, source.emptyOverride?.path] : null;
   // Preserve existing Original backups, while isolating every named branch.
-  return DRAFT_PREFIX + JSON.stringify([server.replace(/\/$/, ''), snapshot.workflowKey || snapshot.workflowId, snapshot.workflowId, planId, effectiveRunName(workflow.prompt, planId), ...(branch === 'main' ? [] : [branch])]);
+  return DRAFT_PREFIX + JSON.stringify([server.replace(/\/$/, ''), snapshot.workflowKey || snapshot.workflowId, snapshot.workflowId, planId, effectiveRunName(workflow.prompt, planId), ...(branch === 'main' ? [] : [branch]), ...(sourceScope ? [sourceScope] : [])]);
 }
 export function savedDraft(scope: string, base: LiveSnapshot, draft: Workflow): SavedDraft {
   return { version: 1, scope, name: base.name, updatedAt: new Date().toISOString(), edits: diffInputs(base, draft).filter(edit => !privateWidget.test(edit.widget)).map(edit => ({ ...edit, class_type: base.nodes[edit.node].class_type })) };

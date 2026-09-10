@@ -26,9 +26,12 @@ test('connected authoring, project ambiguity, and missing ownership helpers affe
   const value = snapshot();
   value.capabilities.ownership = false;
   assert.equal(task(value, 'asset-update').status, 'unavailable');
+  value.capabilities.ownership = true;
   value.nodes.p.editable = ['run_name'];
   assert.equal(task(value, 'patch').status, 'unavailable');
-  assert.equal(task(value, 'take-final-cut').status, 'unavailable');
+  // Saved-picture selection does not edit the Plan document; restoration does.
+  assert.equal(task(value, 'take-final-cut').status, 'available');
+  assert.equal(task(value, 'checkpoint-preview').status, 'unavailable');
   assert.equal(task(value, 'queue').status, 'available');
   value.nodes.duplicate = structuredClone(value.nodes.assets);
   assert.equal(task(value, 'queue').status, 'unavailable');
@@ -39,4 +42,15 @@ test('unknown schemas stay unknown, and frontend virtual nodes are not reported 
   value.nodes.reroute = { class_type: 'Reroute', inputs: {}, virtual: true };
   assert.deepEqual(unregisteredNodes(value, {}), []);
   assert.deepEqual(unregisteredNodes(value, { MiniMaxH3ChainPlanModern: {} }), [{ nodeId: 'assets', classType: 'MiniMaxH3ProjectAssetManager' }]);
+});
+
+test('connected-source editing requires its explicit bridge capability', () => {
+  const value = snapshot();
+  value.nodes.p.inputs.plan_json_input = ['text', 0];
+  value.nodes.text = { class_type: 'PrimitiveStringMultiline', inputs: { value: '{"shots":[]}' }, editable: ['value'] };
+  delete value.capabilities.planSourceVersion;
+  assert.equal(task(value, 'patch').status, 'unavailable');
+  assert.match(task(value, 'patch').detail, /Refresh the ComfyUI tab/);
+  value.capabilities.planSourceVersion = 1;
+  assert.equal(task(value, 'patch').status, 'available');
 });

@@ -1,12 +1,13 @@
 import { PROTOCOL, validateEdits } from './bridge-core.mjs';
 import { finalCutDocument, checkpointImpact, checkpointStamp } from './takes-core.mjs';
 
-import { workingBranch, branchPath, verifyBranch } from './branches-core.mjs';
+import { branchPath, verifyBranch } from './branches-core.mjs';
 import { resolvePlanBinding, workflowBindings } from './binding-core.mjs';
 import { saveWorkflowFile, workflowFileStatus } from './workflow-file.mjs';
 import { createCommandSession } from './command-session.mjs';
 import { discoverH3 } from './h3-discovery.mjs';
 import { productionRoles } from './workflow-roles.mjs';
+import { resolvePlanDocument, planBranchSource } from './plan-source.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -51,10 +52,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       seen.add(graph);
       graphPrefixes.set(graph, prefix);
       for (const node of graph._nodes || []) {
-        const id = prefix + node.id, inputs = {}, editable = [], inputErrors = [], inputSources = {};
+        const id = prefix + node.id, inputs = {}, editable = [], inputErrors = [], inputSources = {}, runtimeText = [];
         for (const item of node.widgets || []) {
           if (!item.name || privateWidget.test(item.name) || !scalar(item.value)) continue;
           inputs[item.name] = item.value;
+          if (item.dynamicPrompts || ['PrimitiveNode', 'PrimitiveString', 'PrimitiveStringMultiline'].includes(node.comfyClass || node.type) && (typeof item.serializeValue === 'function' || node.properties?.['Run widget replace on values'])) runtimeText.push(item.name);
           if (!['catalog_json', 'working_branch_id'].includes(item.name) && !['button', 'converted-widget'].includes(item.type) && !item.disabled && !item.options?.readOnly && !node.inputs?.some(input => input.name === item.name && input.link != null)) editable.push(item.name);
         }
         for (const input of node.inputs || []) {
@@ -68,7 +70,8 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
           }
           else inputErrors.push(input.name);
         }
-        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable, inputErrors, inputSources, scopeActive, virtual: Boolean(node.isVirtualNode || node.subgraph), requiresOwnership: Boolean(widget(node, 'ownership_json')),
+        nodes[id] = { class_type: node.comfyClass || node.type, title: node.title || node.type, mode: node.mode || 0, inputs, editable, inputErrors, inputSources, runtimeText, scopeActive, virtual: Boolean(node.isVirtualNode || node.subgraph), requiresOwnership: Boolean(widget(node, 'ownership_json')),
+          ...((node.comfyClass || node.type) === 'PrimitiveNode' ? { literalWidget: node.widgets?.[0]?.name || '' } : {}),
           ...((node.comfyClass || node.type) === 'GetNode' ? { routing: { busAncestors: typeof node.resolveVirtualOutput === 'function' } } : {}) };
         refs.set(id, node);
         if (node.subgraph) {
@@ -85,7 +88,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     return { ...document, revision, workflowFile: workflowFileStatus(app), productionBindings: document.projectBindings.plans.map(plan => productionRoles(nodes, plan.planId)) };
   }
@@ -106,10 +109,13 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
   }
   function projectPlan(command) {
     const manager = projectNode(command), plan = refs.get(command.plan);
-    if (!plan || !['MiniMaxH3ChainPlan', 'MiniMaxH3ChainPlanModern', 'MiniMaxH3ChainPlanStudio'].includes(plan.comfyClass || plan.type) || !widget(plan, 'plan_json')) throw new Error('Select the attached H3 Plan before managing takes.');
+    if (!plan || !['MiniMaxH3ChainPlan', 'MiniMaxH3ChainPlanModern', 'MiniMaxH3ChainPlanStudio'].includes(plan.comfyClass || plan.type)) throw new Error('Select the attached H3 Plan before managing takes.');
     if ((plan.comfyClass || plan.type) === 'MiniMaxH3ChainPlanStudio' && plan.inputs?.some(input => input.name === 'plan' && input.link != null)) throw new Error('Select the upstream Plan instead of its connected Plan Studio before managing takes.');
-    if (!snapshot().nodes[command.plan]?.editable.includes('plan_json')) throw new Error('The attached Plan JSON is controlled by a connection or is read-only.');
-    const branch = workingBranch(snapshot().nodes[command.plan].inputs);
+    const current = snapshot(), document = resolvePlanDocument(current.nodes, command.plan);
+    if (document.status !== 'resolved') throw new Error(document.reason);
+    if (command.action.startsWith('checkpoint-') && (document.nodeId !== command.plan || document.widget !== 'plan_json' || !document.editable)) throw new Error('Native checkpoint restoration currently writes the Plan backing widget. A connected Plan source requires a source-aware restoration adapter; its fallback will not be overwritten.');
+    const branch = planBranchSource(current.nodes, command.plan).id;
+    if (!branch) throw new Error('The effective Plan working branch cannot be verified.');
     if (branch !== (command.branch_id || 'main')) throw new Error('The Plan working branch changed. Refresh before managing takes.');
     if (branch !== 'main' && !workingBranches) throw new Error('This installed H3 adapter does not support named working branches.');
     return { manager, plan };
@@ -141,9 +147,12 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       requestOptions = await ownershipOptions(node, command.project, requestOptions);
     }
     assertCurrent(command); // Ownership checks yield; a tab/project may change meanwhile.
-    if (command.plan) projectPlan(command);
+    if (command.plan) {
+      if (command.action.startsWith('asset-')) projectNode(command);
+      else projectPlan(command);
+    }
     effectsStarted.add(command);
-    const response = await api.fetchApi(command.plan ? branchPath(path, command.branch_id) : path, requestOptions), data = await response.json();
+    const response = await api.fetchApi(command.plan && !command.action.startsWith('asset-') ? branchPath(path, command.branch_id) : path, requestOptions), data = await response.json();
     if (!response.ok) throw new Error(data.error || `H3 returned HTTP ${response.status}`);
     // A completed server write is never redirected onto a newly selected graph.
     if (snapshot().binding !== command.binding || refs.get(command.node) !== node || widget(node, 'run_name')?.value !== command.project) return { data, warning: 'The server action completed, but the ComfyUI tab or project changed. Reattach to refresh it.' };

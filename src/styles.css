@@ -60,3 +60,7 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 .workflow-binding{position:relative}.workflow-binding[open]>.binding-details{position:absolute;top:100%;left:0;z-index:35;width:min(720px,calc(100vw - 32px));box-sizing:border-box;background:#22272d;border:1px solid #4a545e;box-shadow:0 12px 28px #0007;padding-top:8px}
 
 .binding-node small{white-space:nowrap;flex-shrink:0}
+
+.scene-fields{border:0;padding:0;margin:0;min-width:0}.scene-fields:disabled{opacity:.65}.plan-source{padding:10px;margin:0 0 14px;border:1px solid #43525c;border-radius:4px;background:#273039;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.plan-source strong{display:flex;gap:6px;align-items:center}.plan-source p{margin:7px 0}.plan-source.unresolved,.plan-source.ambiguous{border-color:#796847;background:#332e25}.shared-source-change{padding:12px 0;border-top:1px solid #39414a}.shared-source-change li{margin-top:7px;overflow-wrap:anywhere}
+
+.node-widget-field{border:0;padding:0;margin:0;min-width:0}.node-widget-field:disabled{opacity:.65}

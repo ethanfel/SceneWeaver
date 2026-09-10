@@ -54,7 +54,6 @@ export function traceSource(nodes, source) {
 
 export function planChoices(nodes) {
   return Object.entries(nodes).filter(([, node]) => PLAN_TYPES.includes(node.class_type)
-    && typeof node.inputs.plan_json === 'string'
     && !(node.class_type === STUDIO && (link(node.inputs.plan) || (node.inputErrors ?? node._meta?.inputErrors)?.includes('plan'))));
 }
 

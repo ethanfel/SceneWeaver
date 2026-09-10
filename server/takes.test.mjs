@@ -36,6 +36,21 @@ test('final-cut saves preserve unrelated editorial fields and carry the exact re
   assert.throws(() => finalCutDocument(f.data, f.command('take-final-cut', { take_revision: f.alternate.revision, base_revision: 'old', editorial_revision: f.data.editorial.revision })), /active checkpoint changed/);
   f.alternate.alternate_of_revision = 'old'; assert.throws(() => finalCutDocument(f.data, f.command('take-final-cut', { take_revision: f.alternate.revision, base_revision: f.base.revision, editorial_revision: f.data.editorial.revision })), /does not belong/);
 });
+
+test('connected Plan sources scope saved-picture writes without restoring into their inactive fallback', async () => {
+  const f = fixture({ workingBranches: true }), branch = '1'.repeat(32);
+  const source = { id: 'source', type: 'PrimitiveStringMultiline', graph: f.app.graph, widgets: [{ name: 'value', value: JSON.stringify({ shots: [{ id: 'opening', prompt: 'Connected' }], _branch_id: branch }) }], inputs: [] };
+  f.app.graph._nodes.push(source); f.app.graph.links[88] = { origin_id: 'source', origin_slot: 0 }; f.plan.inputs.push({ name: 'plan_json_input', link: 88 });
+  f.data.working_branch_id = branch;
+  const snapshot = f.adapter.snapshot(), options = { revision: snapshot.revision, branch_id: branch };
+  await assert.rejects(f.adapter.command(f.command('checkpoint-preview', options)), /source-aware restoration adapter/);
+  assert.equal(f.writes.length, 0);
+  await f.adapter.command(f.command('take-final-cut', { ...options, take_revision: f.alternate.revision, base_revision: f.base.revision, editorial_revision: f.data.editorial.revision }));
+  assert.equal(f.writes.length, 1);
+  assert.match(f.writes[0].path, new RegExp(`branch_id=${branch}`));
+  assert.equal(JSON.parse(f.plan.widgets[1].value).shots[0].prompt, 'Original');
+  assert.equal(JSON.parse(source.widgets[0].value).shots[0].prompt, 'Connected');
+});
 test('checkpoint preview is read-only, validates the chapter, and issues a single-use restoration ticket', async () => {
   const f = fixture(), preview = await f.adapter.command(f.command('checkpoint-preview'));
   assert.equal(f.writes.length, 0); assert.equal(preview.data.retired[0].scene, 2);

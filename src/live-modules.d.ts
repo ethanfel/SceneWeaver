@@ -33,3 +33,16 @@ declare module '*task-capabilities.mjs' {
   export function planTaskCapabilities(snapshot: LiveSnapshot, planId: string): { version: number; planId: string; tasks: TaskCapability[] };
   export function unregisteredNodes(snapshot: LiveSnapshot, schemas: Schemas): { nodeId: string; classType: string }[];
 }
+declare module '*plan-source.mjs' {
+  type ApiNode = import('./types').ApiNode;
+  type LiveNode = import('./types').LiveNode;
+  type PlanDocument = import('./types').PlanDocument;
+  type SharedPlanEdit = import('./types').SharedPlanEdit;
+  type WidgetEdit = import('./types').WidgetEdit;
+  type TextSource = import('./types').TextSource;
+  export function resolvePlanDocument(nodes: Record<string, ApiNode | LiveNode>, planId: string): PlanDocument;
+  export function needsPlanSourceAdapter(nodes: Record<string, ApiNode | LiveNode>): boolean;
+  export function planBranchSource(nodes: Record<string, ApiNode | LiveNode>, planId: string): { id: string; reason: string };
+  export function textConsumers(nodes: Record<string, ApiNode | LiveNode>, source: TextSource): { node: string; widget: string }[];
+  export function sharedPlanEdits(nodes: Record<string, ApiNode | LiveNode>, edits: WidgetEdit[]): SharedPlanEdit[];
+}

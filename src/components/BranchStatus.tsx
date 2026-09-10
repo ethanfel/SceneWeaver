@@ -19,7 +19,7 @@ export function BranchStatus({ project, planId, branchId, connected, server, sup
     return () => { controller.abort(); clearInterval(timer); };
   }, [project, scope, connected, supported]);
   const current = value.scope === scope ? value : null;
-  const name = current?.branches.find(item => item.id === branchId)?.name || (branchId === 'main' ? 'Original' : branchId.slice(0, 8));
+  const name = current?.branches.find(item => item.id === branchId)?.name || (!branchId ? 'Unresolved' : branchId === 'main' ? 'Original' : branchId.slice(0, 8));
   const studios = resolvePlanBinding(workflow.prompt, planId).studioIds;
   const studio = studios.length === 1 ? studios[0] : undefined;
   return <div className="branch-status" aria-label="Working branch"><span>Working branch: <strong>{name}</strong></span><span>Follows the selected Plan in ComfyUI</span>{editable && studio && <button onClick={() => void command('focus', { node: studio }).catch(error => setValue({ scope, branches: current?.branches || [], error: String(error) }))}>Open Plan Studio</button>}{current?.error && <span role="alert">{current.error}</span>}</div>;

@@ -1,5 +1,7 @@
 // No ComfyUI globals: the consistency rules are shared by the live adapter tests.
 import { workingBranch } from './branches-core.mjs';
+import { planChoices } from './binding-core.mjs';
+import { planBranchSource, resolvePlanDocument, validatePlanSourceEdits } from './plan-source.mjs';
 export const PROTOCOL = 'sceneweaver.live.v1';
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function validateEdits(snapshot, command) {
@@ -17,6 +19,7 @@ export function validateEdits(snapshot, command) {
     if (!same(node.inputs[edit.widget], edit.before)) throw new Error(`Widget ${key} changed in ComfyUI.`);
     if (!['string', 'number', 'boolean'].includes(typeof edit.after) || typeof edit.after === 'number' && !Number.isFinite(edit.after)) throw new Error(`Widget ${key} needs a finite scalar value.`);
   }
+  validatePlanSourceEdits(snapshot.nodes, command.edits, command.shared_sources);
   return command.edits;
 }
 export function diffInputs(base, draft) {
@@ -34,7 +37,12 @@ export function rebaseDraft(base, next, draft) {
   if (base.binding !== next.binding) return { conflicts: ['Workflow tab changed'], draft };
   const edits = diffInputs(base, draft), conflicts = [];
   if (edits.length && Object.entries(base.nodes).some(([id, node]) => workingBranch(node.inputs) !== workingBranch(next.nodes[id]?.inputs))) return { conflicts: ['Working branch changed in ComfyUI. Your draft is still saved for the previous branch.'], draft };
-  const prompt = Object.fromEntries(Object.entries(next.nodes).map(([id, node]) => [id, { class_type: node.class_type, inputs: { ...node.inputs }, _meta: { title: node.title, mode: node.mode, inputErrors: node.inputErrors, routing: node.routing, inputSources: node.inputSources, outputSources: node.outputSources, scopeActive: node.scopeActive } }]));
+  if (edits.length) for (const [id] of planChoices(base.nodes)) {
+    if (planBranchSource(base.nodes, id).id !== planBranchSource(next.nodes, id).id) return { conflicts: ['The effective Plan working branch changed. Your draft is preserved for its previous source and branch.'], draft };
+    const identity = source => JSON.stringify([source.status, source.nodeId, source.widget, source.input, source.path, source.emptyOverride?.path]);
+    if (identity(resolvePlanDocument(base.nodes, id)) !== identity(resolvePlanDocument(next.nodes, id))) return { conflicts: ['The Plan text connection changed in ComfyUI. Your draft still targets its previous source.'], draft };
+  }
+  const prompt = Object.fromEntries(Object.entries(next.nodes).map(([id, node]) => [id, { class_type: node.class_type, inputs: { ...node.inputs }, _meta: { title: node.title, mode: node.mode, inputErrors: node.inputErrors, routing: node.routing, inputSources: node.inputSources, outputSources: node.outputSources, scopeActive: node.scopeActive, editable: node.editable, runtimeText: node.runtimeText, literalWidget: node.literalWidget } }]));
   for (const edit of edits) {
     const remote = next.nodes[edit.node];
     if (!remote?.editable.includes(edit.widget) || !same(remote.inputs[edit.widget], edit.before) && !same(remote.inputs[edit.widget], edit.after)) conflicts.push(`${edit.node}.${edit.widget}`);

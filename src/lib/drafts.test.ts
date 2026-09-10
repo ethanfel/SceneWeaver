@@ -36,9 +36,25 @@ it('keeps Original backups compatible and isolates named branches', () => {
   current.nodes.plan.inputs.plan_json = '{"shots":[],"_branch_id":"11111111111111111111111111111111"}';
   const branch = draftScope('http://comfy:8188', current, 'plan');
   expect(branch).not.toBe(original);
+  // Only standalone Studio has a native working_branch_id input. Ordinary
+  // Plans derive their branch from the effective serialized Plan document.
+  current.nodes.plan.class_type = 'MiniMaxH3ChainPlanStudio';
   current.nodes.plan.inputs.working_branch_id = '22222222222222222222222222222222';
   expect(draftScope('http://comfy:8188', current, 'plan')).not.toBe(branch);
   delete current.nodes.plan.inputs.working_branch_id;
+  current.nodes.plan.class_type = 'MiniMaxH3ChainPlan';
   current.nodes.plan.inputs.plan_json = '{"shots":[],"_branch_id":"main"}';
   expect(draftScope('http://comfy:8188', current, 'plan')).toBe(original);
+});
+
+it('isolates backups by connected text source and effective branch', () => {
+  const current = structuredClone(snapshot);
+  current.nodes.text = { class_type: 'PrimitiveStringMultiline', title: 'Source', mode: 0, inputs: { value: '{"shots":[]}' }, editable: ['value'] };
+  current.nodes.plan.inputs.plan_json_input = ['text', 0];
+  const source = draftScope('http://comfy:8188', current, 'plan');
+  expect(source).not.toBe(draftScope('http://comfy:8188', snapshot, 'plan'));
+  current.nodes.text.inputs.value = '{"shots":[],"_branch_id":"11111111111111111111111111111111"}';
+  expect(draftScope('http://comfy:8188', current, 'plan')).not.toBe(source);
+  current.nodes.text.class_type = 'RuntimePromptGenerator';
+  expect(draftScope('http://comfy:8188', current, 'plan')).toBe('');
 });
