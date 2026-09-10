@@ -36,6 +36,7 @@ export function LibraryOrganizer(p: { catalog: ProjectCatalog; selection: Librar
   }
   const owners = asset ? p.catalog.assets.filter(item => item.id !== asset.id && Object.values((item.options as { audio_tracks?: Record<string, string> } | undefined)?.audio_tracks || {}).includes(asset.id)) : [];
   const shares = asset?.relative_path ? p.catalog.assets.filter(item => item.id !== asset.id && item.relative_path === asset.relative_path) : [];
+  const origin = asset?.source_origin as { project?: string; asset_id?: string; parent_asset_id?: string } | undefined;
   const position = asset ? p.visibleIds.indexOf(asset.id) : -1;
   const orderAsset = (direction: number) => {
     if (!asset) return;
@@ -49,6 +50,7 @@ export function LibraryOrganizer(p: { catalog: ProjectCatalog; selection: Librar
       {!p.editable && <p>Editing is currently unavailable. Check the connection, pending action and H3 update status.</p>}
       {asset ? <>
         <dl><dt>Kind / role</dt><dd>{asset.kind} / {asset.role}</dd><dt>Source</dt><dd>{asset.original_name || 'Unbound media'}</dd><dt>Provenance</dt><dd>{String(asset.source_kind || 'Not reported')}{asset.parent_asset_id ? ` · parent ${String(asset.parent_asset_id)}` : ''}</dd></dl>
+        {origin && <p>Copied from {origin.project} · asset {origin.asset_id}{origin.parent_asset_id ? ` · source parent ${origin.parent_asset_id}` : ''}</p>}
         <label className="field"><span>Asset folder</span><select aria-label="Asset folder" value={destination} onChange={event => setDestination(event.target.value)}><option value="">Unfiled</option>{folders.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <button disabled={!enabled || destination === String(asset.folder_id || '')} onClick={() => void apply('asset_update', { asset_id: asset.id, changes: { folder_id: destination } })}>Move to folder</button>
         <div className="project-actions"><button disabled={!enabled || position <= 0} onClick={() => orderAsset(-1)}>Move earlier</button><button disabled={!enabled || position < 0 || position >= p.visibleIds.length - 1} onClick={() => orderAsset(1)}>Move later</button></div><p>Ordering swaps adjacent cards in the current filter and keeps other cards in place.</p>

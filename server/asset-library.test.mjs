@@ -15,6 +15,51 @@ function fixture() {
   const mutate = async fields => { const result = await inspect(); return adapter.command(command('asset-library-mutate', { base_revision: result.data.catalog.library_revision, ...fields })); };
   return { backend, posts, graph, app, api, adapter, ownershipOptions, command, inspect, mutate };
 }
+test('other-project browsing and copy review are scoped and read-only', async () => {
+  const f = fixture();
+  const projects = await f.adapter.command(f.command('asset-library-source'));
+  assert.deepEqual(projects.data.items.map(item => item.project), ['source_film', 'empty_source']);
+  const source = await f.adapter.command(f.command('asset-library-source', { source_project: 'source_film' }));
+  assert.equal(source.data.assets.length, 3);
+  const result = await f.adapter.command(f.command('asset-library-copy-preview', { source_project: 'source_film', asset_id: 'source_mix', enabled: false, folder_id: 'cast' }));
+  assert.equal(result.data.copyable, true); assert.equal(result.data.assets.length, 2); assert.equal(f.posts.length, 0);
+  await assert.rejects(f.adapter.command(f.command('asset-library-source', { source_project: 'sceneweaver_first_film' })), /another/);
+});
+async function copyFields(f, asset = 'source_mix') {
+  const fields = { source_project: 'source_film', asset_id: asset, enabled: false, folder_id: 'cast' };
+  const review = (await f.adapter.command(f.command('asset-library-copy-preview', fields))).data;
+  return { ...fields, library_action: 'asset_copy', base_revision: review.base_revision, preview_revision: review.preview_revision };
+}
+test('group copies use native ownership and destination IDs with unchanged source', async () => {
+  const f = fixture(), fields = await copyFields(f);
+  const before = await f.adapter.command(f.command('asset-library-source', { source_project: 'source_film' }));
+  const result = await f.adapter.command(f.command('asset-library-mutate', fields));
+  const [mix, stem] = result.data.catalog.assets.slice(-2);
+  assert.equal(mix.options.audio_tracks.vocals, stem.id); assert.equal(mix.options.audio_tracks.full_mix, mix.id);
+  assert.equal(mix.enabled, false); assert.equal(stem.enabled, false); assert.equal(mix.folder_id, 'cast');
+  assert.equal(f.posts[0].options.headers['X-Test-Native-Owner'], 'proof');
+  assert.deepEqual(await f.adapter.command(f.command('asset-library-source', { source_project: 'source_film' })), before);
+});
+test('source changes invalidate copy review and lost responses reconcile without duplication', async () => {
+  const f = fixture(), fields = await copyFields(f, 'source_hero');
+  f.backend.configure({ sourceRename: 'Native source name' });
+  await assert.rejects(f.adapter.command(f.command('asset-library-mutate', fields)), /Source changed/);
+  assert.equal(f.backend.actions().length, 0); assert.equal((await f.inspect()).data.pending, null);
+  const current = await copyFields(f); f.backend.configure({ failure: 'after' });
+  await assert.rejects(f.adapter.command(f.command('asset-library-mutate', current)));
+  assert.equal((await f.inspect()).data.pending, null); assert.equal(f.backend.actions().length, 1);
+});
+test('a reopened parent resumes only the exact saved native copy request', async () => {
+  const f = fixture(), fields = await copyFields(f); f.backend.configure({ failure: 'prepared' });
+  await assert.rejects(f.adapter.command(f.command('asset-library-mutate', fields)), /Interrupted/);
+  const state = (await f.inspect()).data, operation = state.pending.operation_id;
+  const reopened = createAdapter(f.app, f.api, { ownershipOptions: f.ownershipOptions });
+  const snapshot = reopened.snapshot(), command = { action: 'asset-library-mutate', binding: snapshot.binding, revision: snapshot.revision, node: 'm', project: 'sceneweaver_first_film', retry: true, resume_copy: true, operation_id: operation, enabled: true, asset_id: 'source_hero' };
+  const result = await reopened.command(command);
+  assert.equal(result.data.catalog.library_pending_copies.length, 0);
+  assert.equal(f.backend.actions()[0].asset_id, 'source_mix'); assert.equal(f.backend.actions()[0].enabled, false);
+  await assert.rejects(reopened.command({ ...command, revision: reopened.snapshot().revision, operation_id: 'f'.repeat(32) }), /No matching/);
+});
 test('library reads use exact project scope and do not create native project state', async () => {
   const f = fixture(), value = await f.inspect(); assert.equal(value.data.catalog.folders.length, 2); assert.equal(f.posts.length, 0);
   await assert.rejects(f.adapter.command(f.command('asset-library-inspect', { project: 'other' })), /project/);

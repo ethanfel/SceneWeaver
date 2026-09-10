@@ -4,6 +4,20 @@ Active goal: implement [the complete roadmap](../WORKFLOW_PARITY_PLAN.md), prese
 
 Release convention requested by the user: continue the current work as **0.5.1, 0.5.2, ...**. Do not increment the minor version for each implementation batch.
 
+## 0.5.13: reviewed imports from other H3 projects
+
+The full M0–M8 goal remains active. This patch advances A01–A03 with a Media source browser and recoverable grouped imports, while retaining the 0.5.x release convention.
+
+- **Media → Other projects** lists native project catalogs, filters source assets, previews originals and reviews destination folder/enabled intent. It keeps the selected Plan and source library unchanged. Existing Source tracks cause another copied Source track to default disabled; enabling a conflicting one is rejected by native review.
+- The updated native draft [H3 PR #62](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/pull/62), branch `sceneweaver-asset-library` at `377855a`, advertises `library_copy_version: 1`. Browsing remains available on older H3; copying requires this capability and current target ownership.
+- Native import semantics run in a private staging store. A complete root/stem group is published with one authoritative destination catalog/receipt commit after the media copies are verified. Audio IDs are remapped, stems remain disabled audio references, tags stay unique and source/derived provenance is retained under `source_origin`. The organizer displays source project, asset and parent identities.
+- Reviews cover source/target catalogs, media identities and destination intent. Stale publication is rejected. An uncertain response retains its operation; prepared media and request state survive server/parent restart. **Resume saved import** submits the stored request, preserving its original IDs and frozen bytes. Native phases report saved progress, not process liveness. Rejected copies remove their unreferenced promoted media; I/O failures retain staging for recovery. Completed staging cleanup is best effort and operation manifests remain bounded at 1,024.
+- Source-list and preview requests retain workflow/project scope, run as reads and discard late replies when the selection changes. The new adapter copy capability is separate from native server support.
+
+Validation: the 0.5.13 build, all 37 frontend + 137 adapter/proxy tests, and the complete 131-case browser suite passed. Six new browser cases cover source preview/provenance, grouped audio, stale source/target reviews, parent-restart recovery, late replies, legacy compatibility and compact layout. Native CPU/temp-file tests cover groups/provenance, missing or changed source bytes, one catalog publication, preparation/promotion/commit interruption, restart/replay, concurrent destination changes and actual route ownership. Browser fixtures model HTTP behavior; native tests establish filesystem guarantees separately. The 1280×720 source browser was visually inspected. The production panel still reports no connected tabs and the previous `wf:a08e1` target is absent; this does not establish that the ComfyUI server is unavailable. No production writes or GPU execution were performed.
+
+A01–A03/M2 remain partial: input/output source browsers, complete metadata presentation, whole-project duplication, complete workflow/branch usage analysis and representative production validation remain open. This patch does not claim workflow parity.
+
 ## 0.5.12: native project-library organization
 
 - Media displays project-shared folders alongside its asset cards. All media, Unfiled and named folder filters compose with the existing text/kind filters. Folder creation, rename/color, ordering and removal use native semantics; removal unfiles cards. A scrollable folder list keeps its controls reachable in the compact workspace.

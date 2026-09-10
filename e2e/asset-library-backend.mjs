@@ -3,20 +3,38 @@ import { createHash, randomUUID } from 'node:crypto';
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 32);
 const id = prefix => `${prefix}_${randomUUID().replaceAll('-', '')}`;
 export function assetLibraryFixture() {
-  let catalog, actions = [], receipts = {}, legacy = false, failure = '';
+  let catalog, sources, pending = {}, actions = [], receipts = {}, legacy = false, failure = '';
   const reset = () => {
     catalog = { project: 'sceneweaver_first_film', folders: [{ id: 'cast', name: 'Cast', color: '#567080' }, { id: 'places', name: 'Locations', color: '#705680' }], assets: [
       { id: 'hero', tag: 'hero', kind: 'image', role: 'picture', enabled: true, original_name: 'hero.png', relative_path: 'images/hero.png', folder_id: 'cast', source_kind: 'input' },
       { id: 'room', tag: 'room', kind: 'image', role: 'semantic_anchor', enabled: true, original_name: 'room.png', relative_path: 'images/room.png', folder_id: 'places' },
       { id: 'mix', tag: 'score', kind: 'audio', role: 'source_track', enabled: true, options: { audio_tracks: { full_mix: 'mix', vocals: 'vocals' } } },
       { id: 'vocals', tag: 'vocals', kind: 'audio', role: 'audio_reference', enabled: true },
-    ] }; actions = []; receipts = {}; legacy = false; failure = '';
+    ] }; actions = []; receipts = {}; pending = {}; legacy = false; failure = '';
+    sources = { source_film: { project: 'source_film', folders: [], assets: [
+      { id: 'source_hero', tag: 'hero', kind: 'image', role: 'picture', enabled: true, original_name: 'hero.png', source_kind: 'derived_image', parent_asset_id: 'original_picture' },
+      { id: 'source_mix', tag: 'imported_score', kind: 'audio', role: 'source_track', enabled: true, original_name: 'score.wav', options: { audio_tracks: { full_mix: 'source_mix', vocals: 'source_vocals', instrumental: '' } } },
+      { id: 'source_vocals', tag: 'imported_vocals', kind: 'audio', role: 'audio_reference', enabled: false, original_name: 'vocals.wav' },
+    ] }, empty_source: { project: 'empty_source', folders: [], assets: [] } };
   };
   reset();
-  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_revision: hash(catalog) }) });
+  const listing = () => structuredClone({ ...catalog, revision: hash(catalog.assets.map(item => [item.id, item.tag, item.enabled])), ...(legacy ? {} : { library_command_version: 1, library_copy_version: 1, library_pending_copies: Object.values(pending).map(request => ({ operation_id: request.operation_id, action: 'asset_copy', phase: 'prepared' })), library_revision: hash(catalog) }) });
+  const review = (source, assetId, enabled, folder) => {
+    const root = sources[source]?.assets.find(item => item.id === assetId);
+    if (!root) return { error: 'Source asset is missing.' };
+    const ids = new Set([root.id, ...Object.values(root.options?.audio_tracks || {}).filter(Boolean)]);
+    const copyable = !(enabled && root.role === 'source_track' && catalog.assets.some(item => item.role === 'source_track' && item.enabled));
+    return { project: catalog.project, source_project: source, asset_id: assetId, base_revision: hash(catalog), enabled, folder_id: folder,
+      preview_revision: hash([catalog, sources[source], assetId, enabled, folder]).repeat(2), assets: sources[source].assets.filter(item => ids.has(item.id)), copyable, issue: copyable ? '' : 'The destination already has an enabled Source track. Copy this one disabled.' };
+  };
   async function handle(path, options = {}) {
     const url = new URL(path, 'http://fixture');
-    if (!options.body) { const operation = url.searchParams.get('operation_id'); return Response.json(operation ? { catalog: listing(), receipt: receipts[operation]?.receipt || null } : listing()); }
+    if (!options.body) {
+      if (url.pathname.endsWith('/projects')) return Response.json({ items: [catalog, ...Object.values(sources)].map(item => ({ project: item.project, asset_count: item.assets.length })) });
+      if (url.searchParams.has('copy_source')) return Response.json(review(url.searchParams.get('copy_source'), url.searchParams.get('copy_asset'), url.searchParams.get('enabled') === 'true', url.searchParams.get('folder_id') || ''));
+      if (sources[url.searchParams.get('project')]) return Response.json(sources[url.searchParams.get('project')]);
+      const operation = url.searchParams.get('operation_id'); return Response.json(operation ? { catalog: listing(), receipt: receipts[operation]?.receipt || null, pending_copy: pending[operation] ? { request: pending[operation], phase: 'prepared' } : null } : listing());
+    }
     const body = JSON.parse(options.body);
     if (failure === 'before') { failure = ''; throw new Error('Dropped library request'); }
     if (failure === 'conflict' || failure === 'ownership') { const status = failure === 'conflict' ? 409 : 423; failure = ''; return Response.json({ error: status === 409 ? 'The library changed. Refresh and review.' : 'Project is read-only.' }, { status }); }
@@ -24,6 +42,7 @@ export function assetLibraryFixture() {
     if (saved) return saved.fingerprint === hash(body) ? Response.json({ catalog: listing(), receipt: saved.receipt, replayed: true }) : Response.json({ error: 'Changed operation' }, { status: 400 });
     if (legacy || body.command_version !== 1) return Response.json({ error: 'Unsupported library command' }, { status: 400 });
     if (body.project !== catalog.project || body.base_revision !== listing().library_revision) return Response.json({ error: 'The library changed. Refresh and review.' }, { status: 409 });
+    if (body.action === 'asset_copy' && failure === 'prepared') { pending[body.operation_id] = structuredClone(body); failure = ''; throw new Error('Interrupted prepared copy'); }
     const asset = catalog.assets.find(item => item.id === body.asset_id), folder = catalog.folders.find(item => item.id === body.folder_id);
     const beforeAssets = catalog.assets.map(item => item.id), beforeFolders = catalog.folders.map(item => item.id);
     const reorder = (values, ids) => {
@@ -31,7 +50,17 @@ export function assetLibraryFixture() {
       return ids.map(id => values.find(item => item.id === id));
     };
     try {
-      if (body.action === 'folder_create') { if (catalog.folders.some(item => item.name === body.name)) throw new Error('Folder already exists'); catalog.folders.push({ id: id('folder'), name: body.name, color: body.color }); }
+      if (body.action === 'asset_copy') {
+        const preview = review(body.source_project, body.asset_id, body.enabled, body.folder_id);
+        if (!preview.copyable || preview.preview_revision !== body.preview_revision) return Response.json({ error: preview.issue || 'Source changed after review.' }, { status: 409 });
+        const mapped = Object.fromEntries(preview.assets.map(item => [item.id, id('copy')]));
+        catalog.assets.push(...preview.assets.map((item, index) => ({ ...structuredClone(item), id: mapped[item.id], tag: item.tag === 'hero' ? 'hero_2' : item.tag,
+          parent_asset_id: undefined, source_kind: 'project', source_origin: { project: body.source_project, asset_id: item.id, parent_asset_id: item.parent_asset_id },
+          enabled: index === 0 ? body.enabled : false, role: index === 0 ? item.role : 'audio_reference', folder_id: body.folder_id,
+          options: item.options?.audio_tracks ? { audio_tracks: Object.fromEntries(Object.entries(item.options.audio_tracks).map(([key, value]) => [key, mapped[value] || ''])) } : {} })));
+        delete pending[body.operation_id];
+      }
+      else if (body.action === 'folder_create') { if (catalog.folders.some(item => item.name === body.name)) throw new Error('Folder already exists'); catalog.folders.push({ id: id('folder'), name: body.name, color: body.color }); }
       else if (body.action === 'folder_update') Object.assign(folder, body.changes);
       else if (body.action === 'folder_delete') { catalog.folders = catalog.folders.filter(item => item !== folder); catalog.assets.forEach(item => { if (item.folder_id === body.folder_id) item.folder_id = ''; }); }
       else if (body.action === 'folder_reorder') catalog.folders = reorder(catalog.folders, body.folder_ids);
@@ -54,14 +83,14 @@ export function assetLibraryFixture() {
     if (failure === 'after') { failure = ''; throw new Error('Lost library acknowledgement'); }
     return Response.json({ catalog: listing(), receipt, replayed: false });
   }
-  return { reset, handle, listing, actions: () => actions, configure: value => { legacy = Boolean(value.legacy); failure = value.failure || ''; if (value.rename) catalog.folders[0].name = value.rename; } };
+  return { reset, handle, listing, actions: () => actions, configure: value => { legacy = Boolean(value.legacy); failure = value.failure || ''; if (value.rename) catalog.folders[0].name = value.rename; if (value.sourceRename) sources.source_film.assets[0].tag = value.sourceRename; } };
 }
 export function installAssetLibraryFixture(app) {
   const fixture = assetLibraryFixture(); let enabled = false;
   app.post('/test/asset-library', (req, res) => { enabled = true; fixture.configure(req.body || {}); res.json({}); });
   app.get('/test/asset-library', (_req, res) => res.json({ catalog: fixture.listing(), actions: fixture.actions() }));
   app.use(['/minimax_h3_context_loop/project-assets', '/minimax_h3_context_loop/project-assets/library'], async (req, res, next) => {
-    if (!enabled || !/^\/minimax_h3_context_loop\/project-assets(?:\/library)?(?:\?|$)/.test(req.originalUrl)) return next();
+    if (!enabled || !/^\/minimax_h3_context_loop\/project-assets(?:\/library|\/projects)?(?:\?|$)/.test(req.originalUrl)) return next();
     try { const value = await fixture.handle(req.originalUrl, req.method === 'POST' ? { body: JSON.stringify(req.body) } : {}); res.status(value.status).json(await value.json()); }
     catch { res.status(200).type('application/json').end('{"'); }
   });

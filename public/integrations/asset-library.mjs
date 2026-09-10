@@ -1,5 +1,5 @@
 const endpoint = '/minimax_h3_context_loop/project-assets';
-const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder']);
+const actions = new Set(['folder_create', 'folder_update', 'folder_delete', 'folder_reorder', 'asset_update', 'asset_duplicate', 'asset_delete', 'asset_reorder', 'asset_copy']);
 
 export function createAssetLibrary({ api, verify, write }) {
   const retained = new Map();
@@ -31,10 +31,38 @@ export function createAssetLibrary({ api, verify, write }) {
     }
     return { ...present(catalog, command), message };
   }
+  async function source(command) {
+    verify(command);
+    if (command.source_project === command.project) throw new Error('Choose another project.');
+    const params = command.source_project ? { project: command.source_project, create: 'false' } : {};
+    const response = await api.fetchApi(`${endpoint}${command.source_project ? `?${new URLSearchParams(params)}` : '/projects'}`);
+    const value = await response.json(); verify(command);
+    if (!response.ok) throw new Error(value.error || 'Cannot browse other projects.');
+    if (command.source_project) return validate(value, { project: command.source_project });
+    if (!Array.isArray(value.items) || value.items.some(item => typeof item.project !== 'string')) throw new Error('H3 returned an invalid project list.');
+    return { items: value.items.filter(item => item.project !== command.project) };
+  }
+  async function preview(command) {
+    verify(command);
+    if (!command.source_project || command.source_project === command.project) throw new Error('Choose another project.');
+    const response = await api.fetchApi(`${endpoint}?${new URLSearchParams({ project: command.project, create: 'false', copy_source: command.source_project, copy_asset: command.asset_id, enabled: String(command.enabled), folder_id: command.folder_id || '' })}`);
+    const value = await response.json(); verify(command);
+    if (!response.ok) throw new Error(value.error || 'Cannot review this copy.');
+    if (value.project !== command.project || value.source_project !== command.source_project || value.asset_id !== command.asset_id || value.enabled !== command.enabled || value.folder_id !== (command.folder_id || '') || !Array.isArray(value.assets) || !/^[0-9a-f]{64}$/.test(value.preview_revision || '')) throw new Error('H3 returned a copy preview for an unexpected selection.');
+    return value;
+  }
   async function mutate(command) {
     verify(command);
     let body = retained.get(key(command));
     if (command.retry) {
+      if (!body && command.resume_copy) {
+        const status = await read(command, command.operation_id);
+        validate(status.catalog, command);
+        const recovered = status.pending_copy?.request;
+        if (status.receipt?.operation_id === command.operation_id && status.receipt.project === command.project) return { data: present(status.catalog, command) };
+        if (!recovered || recovered.project !== command.project || recovered.operation_id !== command.operation_id || recovered.action !== 'asset_copy' || recovered.command_version !== 1) throw new Error('No matching recoverable copy was found in H3.');
+        body = recovered; retained.set(key(command), body);
+      }
       if (!body || body.operation_id !== command.operation_id) throw new Error('No matching library request is retained in this ComfyUI tab.');
     } else {
       if (body) throw new Error('Check the pending library change before sending another.');
@@ -42,7 +70,8 @@ export function createAssetLibrary({ api, verify, write }) {
       if (!present(catalog, command).writable) throw new Error('Update H3 to enable conditional library edits.');
       if (catalog.library_revision !== command.base_revision) throw new Error('The library changed. Refresh and review before applying.');
       if (!actions.has(command.library_action)) throw new Error('Unsupported library action.');
-      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
+      if (command.library_action === 'asset_copy' && catalog.library_copy_version !== 1) throw new Error('Update H3 to enable reviewed project copies.');
+      const fields = Object.fromEntries(['asset_id', 'folder_id', 'name', 'color', 'tag', 'changes', 'asset_ids', 'folder_ids', 'source_project', 'enabled', 'preview_revision'].filter(field => Object.hasOwn(command, field)).map(field => [field, command[field]]));
       body = { command_version: 1, project: command.project, action: command.library_action,
         operation_id: crypto.randomUUID().replaceAll('-', ''), base_revision: catalog.library_revision, ...fields };
       retained.set(key(command), body);
@@ -58,5 +87,5 @@ export function createAssetLibrary({ api, verify, write }) {
       throw error;
     }
   }
-  return { inspect, mutate };
+  return { inspect, mutate, source, preview };
 }
