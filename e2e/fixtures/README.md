@@ -13,3 +13,5 @@ ffmpeg -f lavfi -i color=c=0x263a4d:s=160x90:r=24:d=2 -an -c:v libx264 -pix_fmt 
 ```
 
 Normal test runs use the committed files and do not require FFmpeg.
+
+The two native branch modules under `h3-native` are pinned upstream copies; see [third-party notices](../../THIRD_PARTY_NOTICES.md). `e2e/branch-studio.mjs` supplies synthetic mounted-Studio callbacks and an in-memory server around that real controller. It does not establish production-browser validation of the full H3 editor.

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { LiveResult, WorkingBranch, Workflow } from '../types';
+import type { LiveResult, LiveSnapshot, WorkingBranch, Workflow } from '../types';
+import { BranchMenu } from './BranchMenu';
 import { comfy, H3 } from '../lib/api';
 import { resolvePlanBinding } from '../../public/integrations/binding-core.mjs';
 
-export function BranchStatus({ project, planId, branchId, connected, server, supported, workflow, command, editable }: { project: string; planId: string; branchId: string; connected: boolean; server: string; supported?: boolean; workflow: Workflow; command: (action: string, options?: Record<string, unknown>) => Promise<LiveResult>; editable: boolean }) {
+export function BranchStatus({ project, planId, branchId, connected, server, supported, workflow, command, editable, snapshot, scene }: { project: string; planId: string; branchId: string; connected: boolean; server: string; supported?: boolean; workflow: Workflow; command: (action: string, options?: Record<string, unknown>) => Promise<LiveResult>; editable: boolean; snapshot?: LiveSnapshot | null; scene: number }) {
+  const [open, setOpen] = useState(false);
   const [value, setValue] = useState<{ scope: string; branches: WorkingBranch[]; error?: string }>({ scope: '', branches: [] });
   const scope = `${server}:${project}:${branchId}`;
   useEffect(() => {
@@ -22,5 +24,7 @@ export function BranchStatus({ project, planId, branchId, connected, server, sup
   const name = current?.branches.find(item => item.id === branchId)?.name || (!branchId ? 'Unresolved' : branchId === 'main' ? 'Original' : branchId.slice(0, 8));
   const studios = resolvePlanBinding(workflow.prompt, planId).studioIds;
   const studio = studios.length === 1 ? studios[0] : undefined;
-  return <div className="branch-status" aria-label="Working branch"><span>Working branch: <strong>{name}</strong></span><span>Follows the selected Plan in ComfyUI</span>{editable && studio && <button onClick={() => void command('focus', { node: studio }).catch(error => setValue({ scope, branches: current?.branches || [], error: String(error) }))}>Open Plan Studio</button>}{current?.error && <span role="alert">{current.error}</span>}</div>;
+  const native = studio && snapshot?.branchControls?.[studio];
+  const nativeName = native && native.run_name === project && native.selected === branchId ? native.branches.find(item => item.id === branchId)?.name : '';
+  return <><div className="branch-status" aria-label="Working branch"><span>Working branch: <strong>{nativeName || name}</strong></span><span>Follows the selected Plan in ComfyUI</span><button onClick={() => setOpen(true)}>Branches</button>{editable && studio && <button onClick={() => void command('focus', { node: studio }).catch(error => setValue({ scope, branches: current?.branches || [], error: String(error) }))}>Open Plan Studio</button>}{current?.error && <span role="alert">{current.error}</span>}</div>{open && <BranchMenu key={`${server}:${project}:${planId}`} project={project} planId={planId} branchId={branchId} studios={studios} workflow={workflow} snapshot={snapshot} editable={editable} scene={scene} command={command} close={() => setOpen(false)}/>}</>;
 }

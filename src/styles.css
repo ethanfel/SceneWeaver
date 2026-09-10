@@ -64,3 +64,9 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 .scene-fields{border:0;padding:0;margin:0;min-width:0}.scene-fields:disabled{opacity:.65}.plan-source{padding:10px;margin:0 0 14px;border:1px solid #43525c;border-radius:4px;background:#273039;font-size:11px;line-height:1.5;overflow-wrap:anywhere}.plan-source strong{display:flex;gap:6px;align-items:center}.plan-source p{margin:7px 0}.plan-source.unresolved,.plan-source.ambiguous{border-color:#796847;background:#332e25}.shared-source-change{padding:12px 0;border-top:1px solid #39414a}.shared-source-change li{margin-top:7px;overflow-wrap:anywhere}
 
 .node-widget-field{border:0;padding:0;margin:0;min-width:0}.node-widget-field:disabled{opacity:.65}
+
+.branch-menu { display: grid; gap: 14px; }
+.branch-state, .branch-create { display: grid; gap: 10px; padding: 14px; background: var(--surface-2, #24282c); border: 1px solid var(--border, #3a4046); border-radius: 4px; }
+.branch-create label { display: flex; gap: 8px; align-items: center; }
+.branch-create .field { display: grid; }
+.branch-confirmation { padding: 14px; border: 1px solid #dbb078; border-radius: 4px; }

@@ -90,7 +90,11 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
     visit(root());
     const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
-    return { ...document, revision, workflowFile: workflowFileStatus(app), productionBindings: document.projectBindings.plans.map(plan => productionRoles(nodes, plan.planId)) };
+    const branchControls = {};
+    for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
+      try { branchControls[id] = node._h3BranchCommands.snapshot(); } catch { /* An unmounted Studio is not an available branch controller. */ }
+    }
+    return { ...document, revision, branchControls, workflowFile: workflowFileStatus(app), productionBindings: document.projectBindings.plans.map(plan => productionRoles(nodes, plan.planId)) };
   }
   const assertCurrent = command => {
     const current = snapshot();
@@ -205,6 +209,28 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         if (!node || node.graph !== app.canvas?.graph) throw new Error('Open this node’s graph in ComfyUI first.');
         app.canvas.selectNode?.(node); app.canvas.centerOnNode?.(node);
         return { ok: true };
+      }
+      if (command.action === 'branch-command') {
+        const current = assertCurrent(command), binding = resolvePlanBinding(current.nodes, command.plan);
+        if (binding.status !== 'bound' || binding.project !== command.project || !binding.studioIds.includes(command.studio)) throw new Error('Select the native Plan Studio associated with this Plan and project.');
+        const plan = refs.get(command.plan), studio = refs.get(command.studio), control = studio?._h3BranchCommands;
+        if (!control || control.version !== 1 || control.owner !== plan || typeof control.command !== 'function') throw new Error('This Plan Studio does not expose the native branch command interface. Update H3 and refresh ComfyUI.');
+        const source = resolvePlanDocument(current.nodes, command.plan);
+        if (source.status !== 'resolved' || source.nodeId !== command.plan || source.widget !== 'plan_json' || !source.editable) throw new Error('Native branch loading requires directly editable Plan JSON. Connected sources need a restoration adapter.');
+        if (planBranchSource(current.nodes, command.plan).id !== command.branch_id) throw new Error('The Plan working branch changed. Refresh before continuing.');
+        const state = control.snapshot();
+        if (!state.available || state.busy || state.run_name !== command.project || state.selected !== command.branch_id || state.revision !== command.branch_revision) throw new Error(state.reason || 'Native branch state changed or is busy. Refresh before continuing.');
+        if (command.operation === 'retry' && state.pending?.run_name !== command.project) throw new Error('Return to the pending operation’s project before retrying it.');
+        // Native operations may flush project edits and replace Plan/policy
+        // widgets. Wait for an idle queue and keep the exact parent binding.
+        await requireIdle(); assertCurrent(command);
+        const stillAttached = () => {
+          const latest = snapshot();
+          if (latest.binding !== command.binding || refs.get(command.plan) !== plan || refs.get(command.studio) !== studio || control.owner !== plan || resolvePlanBinding(latest.nodes, command.plan).project !== command.project) throw new Error('The attached workflow, Plan, or project changed during the branch operation.');
+        };
+        effectsStarted.add(command);
+        const result = await control.command(command.operation, command.options || {}, { run_name: command.project, selected: command.branch_id, revision: command.branch_revision }, stillAttached);
+        return { data: result.state, warning: result.warning, snapshot: snapshot() };
       }
       if (command.action === 'queue') {
         const current = assertCurrent(command);

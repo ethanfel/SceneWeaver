@@ -54,3 +54,11 @@ test('connected-source editing requires its explicit bridge capability', () => {
   value.capabilities.planSourceVersion = 1;
   assert.equal(task(value, 'patch').status, 'available');
 });
+test('branch commands require a mounted native controller on the associated Studio', () => {
+  const value = snapshot();
+  value.nodes.studio = { class_type: 'MiniMaxH3ChainPlanStudio', inputs: { plan: ['p', 0] } };
+  value.branchControls = { studio: { version: 1, available: true } };
+  assert.equal(task(value, 'branch-save').status, 'available');
+  value.branchControls.studio.available = false;
+  assert.equal(task(value, 'branch-save').status, 'unavailable');
+});

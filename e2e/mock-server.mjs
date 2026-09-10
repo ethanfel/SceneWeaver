@@ -52,6 +52,7 @@ app.post('/test/review', (_req, res) => {
 });
 app.get('/test/state', (_req, res) => res.json({ submissions, decisions, takeActions }));
 app.get('/scripts/app.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-app.mjs')));
+app.get('/test/branch-studio.mjs', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/branch-studio.mjs')));
 app.get('/scripts/api.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-api.mjs')));
 app.get('/extensions', (_req, res) => res.json(takeData ? ['h3_project_asset_manager.js', 'h3_chain_plan_studio.js', 'h3_chain_checkpoint_manager.js'].map(name => `/extensions/h3-test/${name}`) : []));
 app.use('/extensions/h3-test', express.static(resolve('e2e/fixtures/h3-native')));

@@ -16,3 +16,7 @@ Runtime and development dependencies retain their individual package licenses; t
 ## PreviewRelay interoperability
 
 SceneWeaver includes an independently implemented client for the HTTP and WebSocket protocol exposed by [ComfyUI-PreviewRelay](https://github.com/drozbay/ComfyUI-PreviewRelay), inspected at revision `460878239193fd4dc943d9130db8dc1748228bbb`. PreviewRelay's Python nodes and browser viewer are not bundled or redistributed. Users install that experimental optional node pack separately on their ComfyUI server.
+
+## Native H3 branch test fixtures
+
+`e2e/fixtures/h3-native/h3_working_branches.mjs` and `h3_branch_commands.mjs` are unmodified copies from [ComfyUI MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), commit `36362b7cbf14d1e2e01aba5da173a9792b319f43` (GPL-3.0), proposed in H3 PR #57. Tests use the real native controller with synthetic Studio callbacks and storage. These copies are test fixtures; SceneWeaver's production runtime calls the interface on the user's installed H3 Studio. Other files in that fixture directory are lightweight contract stubs, not copies of the complete native editor.
