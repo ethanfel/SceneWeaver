@@ -26,7 +26,7 @@ export function createCommandSession(adapter, publish = () => {}, { limit = 100,
     if (locks) processing = true;
     try {
       const result = await adapter.command(command);
-      const completed = { ...receipt, status: result?.warning ? 'partial' : 'succeeded', finishedAt: now(), message: result?.warning || '' };
+      const completed = { ...receipt, ...(result?.prompt_id ? { prompt_id: result.prompt_id } : {}), status: result?.warning ? 'partial' : 'succeeded', finishedAt: now(), message: result?.warning || '' };
       if (tracked) update(completed);
       return { result, ...(tracked ? { receipt: completed } : {}) };
     } catch (error) {

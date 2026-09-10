@@ -20,3 +20,5 @@ SceneWeaver includes an independently implemented client for the HTTP and WebSoc
 ## Native H3 branch test fixtures
 
 `e2e/fixtures/h3-native/h3_working_branches.mjs` and `h3_branch_commands.mjs` are unmodified copies from [ComfyUI MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), commit `36362b7cbf14d1e2e01aba5da173a9792b319f43` (GPL-3.0), proposed in H3 PR #57. Tests use the real native controller with synthetic Studio callbacks and storage. These copies are test fixtures; SceneWeaver's production runtime calls the interface on the user's installed H3 Studio. Other files in that fixture directory are lightweight contract stubs, not copies of the complete native editor.
+
+`e2e/fixtures/h3-native/h3_chain_top_level_requeue_coordinator.mjs` is an unmodified GPL-3.0 test copy from the same H3 repository at nightly commit `326453d`. It validates use of the exported native before-queue traversal. Its entry script, the mock ComfyUI serializer/API, and mock execution responses are synthetic; these tests do not execute a GPU workflow or the full ComfyUI frontend.

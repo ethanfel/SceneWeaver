@@ -2,11 +2,11 @@
 
 Planning baseline: 2026-09-10. Companion implementation target; this file does not claim feature completion. See [the implementation plan](../WORKFLOW_PARITY_PLAN.md).
 
-Static census of nightly `cdbd44d`: **89 registered node types**, **50 HTTP method/path pairs**, **23 top-level example workflows**. Counts exclude archived recipes. UI-only branch/prompt/editorial controls are covered in the plan, not captured by counting nodes.
+Static census of nightly `326453d`: **89 registered node types**, **51 HTTP method/path pairs**, **23 top-level example workflows**. Counts exclude archived recipes. UI-only branch/prompt/editorial controls are covered in the plan, not captured by counting nodes.
 
 Every row remains subject to the M0 input/action audit. A generic widget inspector or an Open in ComfyUI shortcut is not proof of dedicated task parity. Milestones indicate completion targets; basic controls may land earlier. Legacy and experimental behavior keeps its upstream classification.
 
-The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
+The [implementation status](IMPLEMENTATION_STATUS.md) tracks shipped progress separately. Version 0.5.1 adds typed production-node associations and task capability evidence; 0.5.2 adds effective Plan text source inspection and editing for supported literal producers; 0.5.3 adds a native branch command menu dependent on H3 PR #57; 0.5.4 adds the six-page resizable workspace and independent source/sequence preview; 0.5.5 adds bounded native generation submission for supported flat workflows. These do not mark the associated authoring, generation, checkpoint or delivery features complete.
 
 ## Registered nodes
 
@@ -182,6 +182,7 @@ These routes exist in the inspected H3 source. They are building blocks, not a p
 | POST | `/chapter-snapshots/retire` | `_chapter_snapshot_retirement` |
 | POST | `/processing-checkpoints/delete-preview` | `_processing_checkpoint_deletion` |
 | POST | `/processing-checkpoints/delete` | `_processing_checkpoint_deletion` |
+| GET | `/storage-inventory` | `_inspect_project_storage` |
 | POST | `/open-run-folder` | `_open_run_folder` |
 | POST | `/run-folder/delete-preview` | `_preview_run_folder_deletion` |
 | POST | `/run-folder/delete` | `_delete_complete_run_folder` |
@@ -244,3 +245,7 @@ Validate each recipe through its complete input → render/review → recovery/o
 ## Updating the register
 
 At each H3 integration update, compare registered IDs, input schemas, frontend actions/import contracts, HTTP schemas/events, and maintained recipes against the pinned commit. Add new rows before claiming parity. Removed/renamed controls require a migration or an explicit compatibility exception. Record real workflow tests separately from synthetic fixtures.
+
+## Storage inventory added in nightly 326453d
+
+The native Checkpoint Manager now has a project-wide read-only storage inspector and inventory JSON download. SceneWeaver coverage belongs to Deliver / recovery (M7): explicit scan, category sizes, filters, longest paths, project-switch invalidation and download. The report spans Original and named branches; a storage path is not branch ownership. Its unreferenced candidates are not deletion eligibility. Migration and integrity validation remain separate upstream work. No SceneWeaver storage inspector is implemented yet.

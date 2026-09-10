@@ -9,7 +9,7 @@
   "upstream": {
     "repository": "https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop",
     "branch": "nightly",
-    "commit": "cdbd44d195bad589ee2fbfb7657bb99261962a94",
+    "commit": "326453d71065f8031c160ea4d504678dab3e0cc1",
     "main_head_observed": "336ee236de09a92dd25b006bbd97b57f82e3639a"
   },
   "scope_note": "Static registered-node, route, and top-level example census, not a widget-level parity claim. No connected production graph was available. Internal node behavior is operated through a purpose-built task; it need not become an individual UI panel. Recipe-only external packs and the live graph require the M0 adapter audit.",
@@ -1155,6 +1155,11 @@
       "method": "GET",
       "path": "/minimax_h3_context_loop/project-assets/media",
       "handler": "_project_asset_media"
+    },
+    {
+      "method": "GET",
+      "path": "/minimax_h3_context_loop/storage-inventory",
+      "handler": "_inspect_project_storage"
     }
   ],
   "recipes": [

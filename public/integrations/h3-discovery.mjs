@@ -42,6 +42,12 @@ export async function discoverH3(api, options = {}) {
     catch { check(id, 'unavailable', `The installed H3 ${id} helper is missing, could not load, or has an unsupported export contract.`); }
   };
   const [assets, studio, manager] = await Promise.allSettled([entry('h3_project_asset_manager.js'), entry('h3_chain_plan_studio.js'), entry('h3_chain_checkpoint_manager.js')]);
+  await probe('generation', 'H3 top-level queue hooks available. ComfyUI serializes the attached graph; the companion validates the requested production scope before submission.', async () => {
+    const source = await entry('h3_chain_top_level_requeue.js');
+    const value = await module(source, 'h3_chain_top_level_requeue_coordinator.mjs');
+    if (!functions(value, ['runBeforeQueuedHooks', 'submitWithPromptIdentity'])) throw new Error();
+    adapters.generationHooks = value;
+  });
   if (assets.status === 'fulfilled') {
     await probe('ownership', 'Native projectMutationOptions function available; project permission is checked at each write.', async () => {
       const value = await module(assets.value, 'h3_project_ownership.mjs');

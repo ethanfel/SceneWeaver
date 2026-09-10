@@ -46,3 +46,10 @@ declare module '*plan-source.mjs' {
   export function textConsumers(nodes: Record<string, ApiNode | LiveNode>, source: TextSource): { node: string; widget: string }[];
   export function sharedPlanEdits(nodes: Record<string, ApiNode | LiveNode>, edits: WidgetEdit[]): SharedPlanEdit[];
 }
+
+declare module '*production-range.mjs' {
+  type LiveSnapshot = import('./types').LiveSnapshot;
+  type Target = { id: string; title: string; loop: string; path: string[] };
+  export function generationTargets(nodes: LiveSnapshot['nodes'], planId: string): Target[];
+  export function generationProposal(snapshot: LiveSnapshot, options: Record<string, unknown>): { target: Target; sceneIds: string[]; reviews: { id: string }[] };
+}

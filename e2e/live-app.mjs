@@ -18,6 +18,16 @@ window.nativeCallbacks = 0;
 export const app = {
   graph, canvas: { graph, selectNode(node) { window.focusedNode = node.id; }, centerOnNode() {} },
   extensionManager: { workflow: { activeWorkflow: workflow, async saveWorkflow(target) { window.savedWorkflow = structuredClone({ path: target.path, graph: target.activeState }); target.isModified = false; } } },
+  async graphToPrompt(current = this.graph) {
+    const output = {};
+    for (const node of current._nodes) {
+      const inputs = {};
+      for (const widget of node.widgets) inputs[widget.name] = widget.serializeValue ? await widget.serializeValue(node) : widget.value;
+      for (const input of node.inputs) { const link = current.links[input.link]; inputs[input.name] = [String(link.origin_id), link.origin_slot]; }
+      output[String(node.id)] = { class_type: node.type, inputs };
+    }
+    return { output, workflow: current.serialize() };
+  },
   async queuePrompt() {
     const prompt = Object.fromEntries(graph._nodes.map(node => [node.id, { class_type: node.type, inputs: { ...Object.fromEntries(node.widgets.map(w => [w.name, w.value])), ...Object.fromEntries(node.inputs.map(input => { const link = graph.links[input.link]; return [input.name, [link.origin_id, link.origin_slot]]; })) } }]));
     const response = await api.fetchApi('/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, client_id: 'native-comfy-client', extra_data: { native_queue_hook: true } }) });

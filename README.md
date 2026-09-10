@@ -1,6 +1,6 @@
 # SceneWeaver
 
-A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.4** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
+A companion workspace for [MiniMax H3 Context Loop](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop), inspired by DaVinci Resolve. Version **0.5.5** focuses on assisting the workflow open in ComfyUI: sequence inspection, prompt drafts, native execution, project assets, takes, and exports.
 
 This repository contains the web app, local proxy, and live workflow bridge. The installable ComfyUI launch button lives in [ComfyUI-SceneWeaver-Companion](https://github.com/ethanfel/ComfyUI-SceneWeaver-Companion).
 
@@ -16,7 +16,7 @@ The bottom navigation now has six production pages. **Workflow** in the top tool
 | --- | --- |
 | Media | Project catalog, uploads/imports, tags, roles, reference enablement and source previews |
 | Edit | Saved sequence player, timeline seeking, scene prompt inspector and Takes/A–B comparison |
-| Generate | PreviewRelay sampling monitor; queue and review controls remain available in the render queue |
+| Generate | Selected scene/range submission on supported native loops, job receipts and PreviewRelay monitor; live review in the render queue |
 | Finish | Saved original and processed take inventories, source preview and downloads |
 | Audio | Soundtrack assets, full mix/vocal/instrumental bindings and caption text |
 | Deliver | Existing saved outputs, previews and downloads |
@@ -25,7 +25,15 @@ Drag the dividers to resize the media pool, inspector, source viewer and timelin
 
 **Source** previews an asset, saved take or processing output independently of the saved sequence. Each viewer has its own position and playback controls. Starting one monitor pauses the other; page changes pause hidden playback. The sequence keeps its position across pages. Asset field drafts and take comparisons survive page navigation during this session; they are not persisted by workspace preferences. Source selection clears when the server, attached workflow, Plan, project or working branch changes.
 
-These pages organize the existing companion tools. Finishing jobs, first-class generation range controls, new assembly/export commands and full editorial/audio editing still require the remaining roadmap adapters; a new page is not a parity claim.
+These pages organize the existing companion tools. Finishing jobs, advanced generation scopes, assembly of saved selections and new export commands and full editorial/audio editing still require the remaining roadmap adapters; a new page is not a parity claim.
+
+## Scene generation (0.5.5)
+
+Attach the intended workflow, choose its production Plan, and apply any prompt draft. On **Generate**, select an assembly output and choose **Selected scene**, **Scene range**, or **Resume through end**. Review the project, working branch and range, then submit. The native queue must be idle. H3 validates source media and predecessor checkpoints when the job executes; a range beginning after scene 1 needs its predecessor checkpoint. Existing native review settings are retained, and the selected assembly receives the accepted prefix.
+
+Submission uses H3's native before-queue helper and ComfyUI's serializer/API. Only the selected output and its serialized dependencies enter the executable payload, including dependencies shared with other outputs. The full workflow metadata is retained. Separate side outputs, including a PreviewRelay branch outside that dependency path, do not execute. Ordinary before/after-queue widget callbacks run with the native partial-execution flag. **Actions** retains the accepted ComfyUI job ID even if SceneWeaver loses the final result message. Checking a receipt never repeats a submission.
+
+The first adapter supports directly editable scope widgets on flat workflows. Subgraphs/promoted controls, connected scope sources and armed ALT drafts need further native adapters. Top-level requeue supports one scene here; multi-scene handoffs currently requeue the whole native graph and need an output-scope contract. Scope settings remain in the workflow after submission; save the workflow separately. GPU execution, a complete creative iteration, and assembly of a subsequently changed saved selection still need native project validation.
 
 ## Integration foundations (0.5)
 

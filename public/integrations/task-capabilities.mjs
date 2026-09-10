@@ -1,5 +1,6 @@
 import { resolvePlanBinding } from './binding-core.mjs';
 import { needsPlanSourceAdapter, planBranchSource, resolvePlanDocument } from './plan-source.mjs';
+import { generationProposal, generationTargets } from './production-range.mjs';
 
 // Availability means the companion has a command adapter, not that permission,
 // media validation, or a later native request has already succeeded.
@@ -30,7 +31,17 @@ export function planTaskCapabilities(snapshot, planId) {
   const studios = binding.studioIds.filter(id => snapshot.branchControls?.[id]?.version === 1 && snapshot.branchControls[id].available);
   const branchesReady = binding.status === 'bound' && nativeRestore && studios.length > 0;
   task('branch-save', 'Save / switch working branch', branchesReady, branchesReady ? 'Calls the mounted native Studio branch controller, including its revision checks, recovery drafts and pending-operation retries. Choose a Studio when several are associated.' : 'A mounted Plan Studio with the native branch command interface and directly editable Plan JSON is required. Workflow file saving does not save branch authoring.');
-  task('generate-range', 'Generate selected scene / range', false, 'Loop nodes can be inspected, but validated range commands are not implemented yet.');
+  let generationReady = false, generationReason = caps.generationReason || 'Native H3 queue hooks and ComfyUI serialization are required.';
+  if (managed && caps.generationVersion === 1) {
+    generationReason = 'No assembly output is bound to a supported generation loop.';
+    for (const target of generationTargets(nodes, planId)) {
+      try {
+        generationProposal(snapshot, { plan: planId, project: binding.project, branch_id: branch.id, target: target.id, start: 1, end: 1, verify: true });
+        generationReady = true; break;
+      } catch (error) { generationReason = error.message; }
+    }
+  }
+  task('generate-range', 'Generate selected scene / range', generationReady, generationReady ? 'Uses native serialization and queue hooks for the selected assembly dependency path. Connected range controls, ALT drafts and subgraphs need dedicated adapters. Top-level continuation supports one scene only.' : !managed ? managedReason : generationReason);
   task('deliver', 'Run an isolated delivery', false, 'Assembly nodes can be inspected. Queuing the whole workflow is not an isolated delivery command.');
   task('finish', 'Run finishing recipe', false, 'Requires exact saved-source selection and a native processing recipe adapter.');
   return { version: 1, planId, tasks };

@@ -70,3 +70,6 @@ input,select,textarea{width:100%;color:#d9dce0;background:#131518;border:1px sol
 .branch-create label { display: flex; gap: 8px; align-items: center; }
 .branch-create .field { display: grid; }
 .branch-confirmation { padding: 14px; border: 1px solid #dbb078; border-radius: 4px; }
+
+.generation-workspace{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:auto}.generation-workspace>.generation-panel{flex:1 0 300px;overflow:visible}.production-controls{padding:16px 18px;border-bottom:1px solid #3a4148;font-size:11px;line-height:1.5}.production-controls h2{font-size:16px;font-weight:500;margin:0}.production-controls .section-heading{margin-bottom:12px}.production-controls p{margin:8px 0}.production-fields{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px}.production-fields .field{min-width:0;margin:0}.production-fields select{width:100%;min-width:0;text-overflow:ellipsis}.production-check{display:flex;align-items:center;gap:7px;margin-top:12px}.production-check input{width:auto}.production-controls .notice{padding:8px;border-left:2px solid #b09065;background:#35332d}.production-controls>.primary{margin-top:8px}
+@media(max-width:1050px){.production-fields{grid-template-columns:minmax(0,1fr)}}

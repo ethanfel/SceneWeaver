@@ -163,13 +163,19 @@ export function useComfy(runName: string, followProject = false, branchId = 'mai
     const reconciliation = setInterval(() => { void refresh(); void refreshCheckpoints(); }, 15000);
     return () => { disposed = true; eventReceiver.current = () => {}; clearTimeout(timer); clearInterval(reconciliation); socket?.close(); };
   }, [connected, refresh, refreshCheckpoints, log, loadHistory]);
+  const trackNative = async (id: string) => {
+    if (!tracked.current.has(id)) {
+      tracked.current.add(id);
+      setJobs(old => [{ id, status: 'Queued' }, ...old]);
+    }
+    await refresh();
+    // Recover jobs that finish before the submission acknowledgement arrives.
+    await loadHistory(id);
+  };
   const enqueue = async (workflow: Workflow) => {
     const result = await post<{ prompt_id: string }>('/prompt', { prompt: workflow.prompt, client_id: clientId.current, extra_data: { extra_pnginfo: { ...(workflow.source ? { workflow: workflow.source } : {}), sceneweaver: { name: workflow.name, version: 1 } } } });
-    tracked.current.add(result.prompt_id);
-    setJobs(old => [{ id: result.prompt_id, status: 'Queued' }, ...old]);
-    log(`Queued ${workflow.name}`); await refresh();
-    // History covers very short jobs that finish before the POST response arrives.
-    await loadHistory(result.prompt_id);
+    log(`Queued ${workflow.name}`);
+    await trackNative(result.prompt_id);
     return result.prompt_id;
   };
   const cancelJob = async (id: string) => {
@@ -186,5 +192,5 @@ export function useComfy(runName: string, followProject = false, branchId = 'mai
     await refresh();
   };
   const receiveEvent = useCallback((event: ComfyEvent) => eventReceiver.current(event), []);
-  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints: checkpointScope === JSON.stringify([runName, branchId]) ? checkpoints : [], editorial: checkpointScope === JSON.stringify([runName, branchId]) ? editorial : null, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, cancelJob, log, receiveEvent, subscribePreviewRelay };
+  return { target, connected, connecting, socketOnline, schemas, gpu, error, setError, queue, reviews, runs, checkpoints: checkpointScope === JSON.stringify([runName, branchId]) ? checkpoints : [], editorial: checkpointScope === JSON.stringify([runName, branchId]) ? editorial : null, outputs, jobs, events, connect, refresh, refreshCheckpoints, enqueue, trackNative, cancelJob, log, receiveEvent, subscribePreviewRelay };
 }

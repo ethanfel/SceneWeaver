@@ -11,9 +11,9 @@ This plan covers the current H3 feature set, including legacy compatibility and 
 ## 1. Baseline and evidence
 
 - SceneWeaver: `68ba383`, version 0.4.0.
-- H3 nightly inspected: [`cdbd44d195bad589ee2fbfb7657bb99261962a94`](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/commit/cdbd44d195bad589ee2fbfb7657bb99261962a94).
+- H3 nightly inventory refreshed: [`326453d71065f8031c160ea4d504678dab3e0cc1`](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/commit/326453d71065f8031c160ea4d504678dab3e0cc1).
 - H3 main observed: `336ee236de09a92dd25b006bbd97b57f82e3639a`. Stable compatibility requires its own matrix; nightly features must not be presumed available on main.
-- Static inventory: **89 registered node types, 50 HTTP method/path pairs, 23 current top-level example workflows**. See [coverage register](planning/H3_FEATURE_COVERAGE.md) and [machine-readable inventory](planning/h3-feature-inventory.json).
+- Static inventory: **89 registered node types, 51 HTTP method/path pairs, 23 current top-level example workflows**. See [coverage register](planning/H3_FEATURE_COVERAGE.md) and [machine-readable inventory](planning/h3-feature-inventory.json).
 - No live ComfyUI panel was connected during this planning pass. The inventory is grounded in upstream source and the current SceneWeaver code, rather than a claimed inspection of the user's open production graph.
 
 Source areas: [node reference](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/NODE_REFERENCE.md), [authoring](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/SCENE_AUTHORING.md), [assets](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/PROJECT_ASSETS.md), [audio/continuity](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/AUDIO_AND_CONTINUITY.md), [references](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/SCHEDULED_REFERENCES.md), [branches](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/WORKING_BRANCHES.md), [recovery/delivery](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/RUNS_AND_RECOVERY.md), [masking](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/docs/MASKED_EDITING.md), and [recipe catalog](https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop/blob/cdbd44d195bad589ee2fbfb7657bb99261962a94/example_workflows/README.md).
@@ -110,7 +110,7 @@ Design rules:
 | G02 | Installed model/encoder/VAE choices, sampler/scheduler/CFG/steps and connected external settings, with graph provenance | Generic scalar inspector | Generate / M3 |
 | G03 | Basic generation profiles, incoming-boundary continuity, context lengths, visual/audio axes and default/scene overrides | Partial generic inputs | Generate + Edit Inspector / M3 |
 | G04 | Plan/reference/source/resume preflight with reasons, affected scenes and navigation to the responsible setting | Local validation; native queue validation | Generate preflight / M0, M3 |
-| G05 | Generate selected scene, bounded range, chapter or unfinished suffix; explicit fresh/resume intent | Queues entire current graph | Generate actions / M1, M3 |
+| G05 | Generate selected scene, bounded range, chapter or unfinished suffix; explicit fresh/resume intent | 0.5.5: bounded native flat-loop commands; advanced scopes and native execution validation pending | Generate actions / M1, M3 |
 | G06 | Recursive or top-level lifecycle; cleanup policy, durable handoff status, cancellation, uncertain submission recovery and single continuation owner | Monitors native queue | Jobs / M3 |
 | G07 | Sampling progress, live PreviewRelay channels, source/output comparisons, per-scene saving status and GPU/memory reporting | Progress and optional channel preview | Generate / M3 |
 | G08 | Candidate count and per-candidate inspection; generate next, early select, keep/discard, live approve/retry/reroll/stop, timeout/unload options | Core review actions; incomplete controls | Generate review tray / M3 |
@@ -359,3 +359,7 @@ The reviewable result is a functional prototype showing one complete production 
 Independent multi-track editing, arbitrary clip instances, split/slip/ripple tools beyond H3's model, transitions, titles, a general audio mixer, color grading/LUTs, and standalone orchestration form a separate editor roadmap. Their persistent edit document should reference immutable H3 media and explicit source in/out points without rewriting generation checkpoints.
 
 The Resolve-inspired presentation starts immediately. The broader standalone editor starts after the supported H3 workflow can be operated reliably from that presentation.
+
+### Upstream delta: read-only storage inspection
+
+Nightly `326453d` adds the project-wide Checkpoint Manager Storage view and `GET /storage-inventory`. Add that read-only scan/report/download flow to M7, preserving its bounded-scan evidence and project-switch cancellation. The upstream storage migration plan is a foundation, not an implemented migration feature. Never treat an inventory's unreferenced candidates as permission to delete artifacts.

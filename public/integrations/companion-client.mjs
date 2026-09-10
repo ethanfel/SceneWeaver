@@ -8,6 +8,8 @@ import { createCommandSession } from './command-session.mjs';
 import { discoverH3 } from './h3-discovery.mjs';
 import { productionRoles } from './workflow-roles.mjs';
 import { resolvePlanDocument, planBranchSource } from './plan-source.mjs';
+import { generationProposal, validateGenerationPrompt } from './production-range.mjs';
+import { assertQueueGraph, submitBoundGeneration } from './bound-submission.mjs';
 
 const H3 = '/minimax_h3_context_loop';
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value));
@@ -15,7 +17,7 @@ const privateWidget = /ownership|operation_json|api[_ -]?key|password|secret|acc
 const token = () => [...crypto.getRandomValues(new Uint8Array(24))].map(v => v.toString(16).padStart(2, '0')).join('');
 const widget = (node, name) => node.widgets?.find(item => item.name === name);
 
-export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics } = {}) {
+export function createAdapter(app, api, { ownershipOptions, publishCatalog, checkpoints: nativeCheckpoints, finalCut = false, workingBranches = false, audioTracks, diagnostics, generationHooks } = {}) {
   let revision = 0, previous = '', bindings = new WeakMap();
   const refs = new Map();
   const previews = new Map();
@@ -88,7 +90,9 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
       }
     }
     visit(root());
-    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
+    let generationReason = '';
+    try { assertQueueGraph(root()); } catch (error) { generationReason = error.message; }
+    const document = { ...descriptor, nodes, projectBindings: workflowBindings(nodes), capabilities: { bindingVersion: 1, taskVersion: 1, planSourceVersion: 1, generationReason, generationVersion: !generationReason && generationHooks && typeof app.graphToPrompt === 'function' && typeof api.queuePrompt === 'function' ? 1 : 0, nativeQueue: typeof app.queuePrompt === 'function', ownership: typeof ownershipOptions === 'function', diagnostics, workingBranches: Boolean(workingBranches), audioTracks: Boolean(audioTracks && ownershipOptions), finalCut: Boolean(finalCut && ownershipOptions), checkpoints: Boolean(nativeCheckpoints && ownershipOptions) } }, serialized = JSON.stringify(document);
     if (serialized !== previous) { previous = serialized; revision++; }
     const branchControls = {};
     for (const [id, node] of refs) if (node._h3BranchCommands?.version === 1 && typeof node._h3BranchCommands.snapshot === 'function' && typeof node._h3BranchCommands.command === 'function') {
@@ -137,7 +141,7 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
   async function requireIdle() {
     const response = await api.fetchApi('/queue'), queue = await response.json();
     if (!response.ok || !Array.isArray(queue.queue_running) || !Array.isArray(queue.queue_pending)) throw new Error('Cannot verify the ComfyUI queue.');
-    if (queue.queue_running.length || queue.queue_pending.length) throw new Error('Wait for the ComfyUI queue to finish before restoring a checkpoint branch.');
+    if (queue.queue_running.length || queue.queue_pending.length) throw new Error('Wait for the ComfyUI queue to finish before this action.');
   }
   function refreshEditors() {
     for (const node of refs.values()) { try { node._h3PlanStudioRefresh?.(); node._h3CheckpointManagerRefresh?.(); } catch { /* Native polling also reconciles saved state. */ } }
@@ -245,6 +249,61 @@ export function createAdapter(app, api, { ownershipOptions, publishCatalog, chec
         const queued = await app.queuePrompt(0, 1);
         if (queued === false) throw Object.assign(new Error('ComfyUI rejected the queue request. Check its validation message.'), { outcome: 'rejected' });
         return { queued: true, snapshot: snapshot() };
+      }
+      if (command.action === 'generate-range') {
+        const initial = assertCurrent(command);
+        if (initial.capabilities.generationVersion !== 1) throw new Error('Native H3 queue hooks and ComfyUI serialization are required. Refresh the ComfyUI tab after updating.');
+        assertQueueGraph(root());
+        const proposal = generationProposal(initial, command);
+        projectPlan({ ...command, node: resolvePlanBinding(initial.nodes, command.plan).managerId });
+        await requireIdle(); assertCurrent(command);
+        const graph = root(), plan = refs.get(command.plan);
+        const changes = proposal.edits.map(edit => ({ ...edit, nodeObject: refs.get(edit.node), item: widget(refs.get(edit.node), edit.widget) }));
+        if (changes.some(change => !change.item || change.item.value !== change.before)) throw new Error('The native scope controls changed before preparation.');
+        let prepared = false, delivered = false, expectedRevision = command.revision;
+        const attached = () => {
+          const current = snapshot();
+          if (root() !== graph || current.binding !== command.binding || refs.get(command.plan) !== plan) throw new Error('The attached workflow changed during generation preparation.');
+          const updated = generationProposal(current, command);
+          if (JSON.stringify(updated.target) !== JSON.stringify(proposal.target) || updated.planText !== proposal.planText) throw new Error('The production path or Plan changed during preparation.');
+          return current;
+        };
+        try {
+          graph.beforeChange?.();
+          try {
+            effectsStarted.add(command); prepared = true;
+            for (const change of changes) change.item.value = change.after;
+            for (const change of changes) change.item.callback?.call(change.item, change.after, app.canvas, change.nodeObject, app.canvas?.graph_mouse, {});
+            graph.change?.(); graph.setDirtyCanvas?.(true, true);
+          } finally { graph.afterChange?.(); }
+          expectedRevision = attached().revision;
+          const result = await submitBoundGeneration({ app, api, graph, hooks: generationHooks,
+            current(stage) {
+              const current = attached();
+              // beforeQueued is synchronous and may intentionally update seeds.
+              // Once those hooks finish, any later graph edit invalidates submission.
+              if (stage === 'after-hooks') expectedRevision = current.revision;
+              else if (current.revision !== expectedRevision) throw new Error('The workflow changed while its prompt was being serialized. Nothing was submitted.');
+            },
+            validate: prompt => validateGenerationPrompt(prompt, proposal),
+            delivering: () => { delivered = true; },
+          });
+          let warning = result.warning;
+          try { attached(); } catch { warning = 'Generation was accepted for the original workflow. Reattach before making further changes.'; }
+          return { queued: true, prompt_id: result.prompt_id, data: { ...result, start: proposal.start, end: proposal.end, project: proposal.project, branch_id: proposal.branch }, warning, snapshot: snapshot() };
+        } catch (thrown) {
+          const error = thrown instanceof Error ? thrown : new Error(String(thrown));
+          if (!delivered && prepared && root() === graph && describe().binding === command.binding) {
+            try {
+              graph.beforeChange?.();
+              try { for (const change of changes) if (change.item.value === change.after) { change.item.value = change.before; change.item.callback?.call(change.item, change.before, app.canvas, change.nodeObject, app.canvas?.graph_mouse, {}); } }
+              finally { graph.change?.(); graph.setDirtyCanvas?.(true, true); graph.afterChange?.(); }
+            } catch { error.message += ' Scope restoration was incomplete; inspect the original workflow controls.'; }
+          }
+          if (!delivered) error.outcome = 'rejected';
+          if (delivered && error.outcome !== 'rejected') error.message = `${error.message || error} Submission may have reached ComfyUI. Check the action receipt and queue; do not repeat the request.`;
+          throw error;
+        }
       }
       if (command.action === 'take-final-cut') {
         if (!finalCut || !ownershipOptions) throw new Error('Reopen the companion from ComfyUI with an H3 version that supports revision-checked final-cut saves.');

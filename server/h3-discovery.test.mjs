@@ -77,3 +77,13 @@ test('extension-list failure is visible while ordinary native workflow functions
   assert.equal(result.diagnostics.checks.find(item => item.id === 'discovery').status, 'unavailable');
   assert.equal(result.ownershipOptions, undefined);
 });
+
+test('generation discovery requires the actual native queue exports independently of branch helpers', async () => {
+  const path = '/extensions/h3/h3_chain_top_level_requeue.js';
+  const env = environment({ paths: [assetPath, studioPath, path], sources: { [path]: `import './h3_chain_top_level_requeue_coordinator.mjs';` }, exports: { runBeforeQueuedHooks() {}, submitWithPromptIdentity() {} } });
+  assert.equal(typeof (await discoverH3(env.api, env.options)).generationHooks.runBeforeQueuedHooks, 'function');
+  const original = env.options.importModule;
+  env.options.importModule = async url => ({ ...await original(url), runBeforeQueuedHooks: undefined });
+  const missing = await discoverH3(env.api, env.options);
+  assert.equal(missing.generationHooks, undefined); assert.equal(typeof missing.ownershipOptions, 'function');
+});

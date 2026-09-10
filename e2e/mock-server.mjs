@@ -54,7 +54,7 @@ app.get('/test/state', (_req, res) => res.json({ submissions, decisions, takeAct
 app.get('/scripts/app.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-app.mjs')));
 app.get('/test/branch-studio.mjs', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/branch-studio.mjs')));
 app.get('/scripts/api.js', (_req, res) => res.type('application/javascript').send(readFileSync('e2e/live-api.mjs')));
-app.get('/extensions', (_req, res) => res.json(takeData ? ['h3_project_asset_manager.js', 'h3_chain_plan_studio.js', 'h3_chain_checkpoint_manager.js'].map(name => `/extensions/h3-test/${name}`) : []));
+app.get('/extensions', (_req, res) => res.json(takeData ? ['h3_project_asset_manager.js', 'h3_chain_plan_studio.js', 'h3_chain_checkpoint_manager.js', 'h3_chain_top_level_requeue.js'].map(name => `/extensions/h3-test/${name}`) : []));
 app.use('/extensions/h3-test', express.static(resolve('e2e/fixtures/h3-native')));
 app.get('/test/starter', (_req, res) => { const data = structuredClone(starter); if (branchData) data['1700'].inputs.plan_json = JSON.stringify({ ...JSON.parse(data['1700'].inputs.plan_json), _branch_id: '1'.repeat(32) }); res.json(data); });
 app.get('/test/live', (_req, res) => res.type('html').send(`<html><body><h1>Mock ComfyUI open workflow</h1><button id="open">Open companion</button><script type="module">import { app } from '/scripts/app.js'; document.querySelector('#open').onclick = async () => { const child = window.open('about:blank', '_blank'); const { launch } = await import('http://127.0.0.1:4319/integrations/companion-client.mjs'); await launch(child, 'http://127.0.0.1:4319'); };</script></body></html>`));
